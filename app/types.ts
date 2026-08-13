@@ -1,0 +1,40 @@
+export type Role = "admin" | "learner";
+export type Question = {
+  id: number;
+  text: string;
+  options: string[];
+  correct: number;
+  explanation: string;
+};
+export type Quiz = {
+  id: string;
+  title: string;
+  description: string;
+  deadline: string;
+  passingScore: number;
+  timeLimit: number;
+  maxAttempts: number;
+  status: "Published" | "Draft";
+  questions: Question[];
+  showScore: boolean;
+  answerRelease: "immediate" | "deadline" | "never";
+  requireFullscreen: boolean;
+  detectTabSwitch: boolean;
+  detectFullscreenExit: boolean;
+  maxViolations: number;
+  autoSubmit: boolean;
+};
+export type Attempt = {
+  id: string;
+  quizId: string;
+  learner: string;
+  date: string;
+  score: number;
+  correct: number;
+  total: number;
+  timeUsed: number;
+  answers: Record<number, number>;
+  status: "Passed" | "Failed";
+  tabSwitches: number;
+  fullscreenExits: number;
+};

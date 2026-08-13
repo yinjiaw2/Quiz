@@ -1,0 +1,16 @@
+import "./globals.css";
+
+export const metadata = {
+  title: "Redbridge 实习生考核",
+  description: "Redbridge 在线实习生考核平台",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="zh-CN">
+      <body>{children}</body>
+    </html>
+  );
+}
