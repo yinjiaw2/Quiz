@@ -623,11 +623,15 @@ function LearnerManagement({
   setRecords,
   attempts,
   open,
+  remove,
+  resetPasswords,
 }: {
   records: LearnerRecord[];
   setRecords: (v: LearnerRecord[]) => void;
   attempts: Attempt[];
   open: (l: LearnerRecord) => void;
+  remove: (l: LearnerRecord) => void;
+  resetPasswords: () => void;
 }) {
   const updateDepartment = (email: string, department: string) =>
     setRecords(
@@ -638,6 +642,12 @@ function LearnerManagement({
       <PageTitle
         title="学员管理"
         desc="编辑学员部门，并查看考核结果和考试记录。"
+        action={
+          <button className="btn-secondary" onClick={resetPasswords}>
+            <Settings2 size={17} />
+            一键重置全部密码
+          </button>
+        }
       />
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
@@ -695,13 +705,25 @@ function LearnerManagement({
                     </td>
                     <td className="px-5 font-semibold">{rows.length}</td>
                     <td className="px-5">
-                      <button
-                        className="flex items-center gap-1 text-sm font-semibold text-brand"
-                        onClick={() => open(l)}
-                      >
-                        查看记录
-                        <ChevronRight size={16} />
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          className="flex items-center gap-1 text-sm font-semibold text-brand"
+                          onClick={() => open(l)}
+                        >
+                          查看记录
+                          <ChevronRight size={16} />
+                        </button>
+                        <button
+                          className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"
+                          title="删除学员"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            remove(l);
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -1772,6 +1794,69 @@ export default function App() {
       ]);
     } catch {}
   };
+  const refreshRemoteLearners = async () => {
+    try {
+      const response = await fetch("/api/admin/users", { cache: "no-store" });
+      if (!response.ok) return;
+      const users: Array<{ username: string; name: string }> =
+        await response.json();
+      setLearnerRecords((current) => [
+        ...current.filter(
+          (learner) => !users.some((user) => user.username === learner.email),
+        ),
+        ...users.map((user) => {
+          const existing = current.find(
+            (learner) => learner.email === user.username,
+          );
+          return {
+            name: user.name,
+            email: user.username,
+            department: existing?.department || "运营",
+            completed: existing?.completed || 0,
+          };
+        }),
+      ]);
+    } catch {}
+  };
+  const deleteLearner = async (learner: LearnerRecord) => {
+    if (!confirm(`确定删除学员“${learner.name}”吗？其考试记录也会删除。`))
+      return;
+    try {
+      const response = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: learner.email, name: learner.name }),
+      });
+      if (!response.ok && response.status !== 404) {
+        const body = await response.json();
+        alert(body.error || "删除失败");
+        return;
+      }
+      setLearnerRecords((current) =>
+        current.filter((item) => item.email !== learner.email),
+      );
+      const aliases = learnerAliases[learner.name] || [learner.name];
+      setAttempts((current) =>
+        current.filter((attempt) => !aliases.includes(attempt.learner)),
+      );
+    } catch {
+      alert("无法连接后端，删除失败");
+    }
+  };
+  const resetAllLearnerPasswords = async () => {
+    if (!confirm("确定将所有学员密码重置为 123456 吗？")) return;
+    try {
+      const response = await fetch("/api/admin/users", { method: "PATCH" });
+      const body = await response.json();
+      if (!response.ok) {
+        alert(body.error || "密码重置失败");
+        return;
+      }
+      alert(`已将 ${body.count} 名学员的密码重置为 123456`);
+    } catch {
+      alert("无法连接后端，密码重置失败");
+    }
+  };
   if (!role)
     return (
       <Login
@@ -1780,6 +1865,7 @@ export default function App() {
           setRole(r);
           setView("dashboard");
           void refreshRemoteAttempts();
+          if (r === "admin") void refreshRemoteLearners();
           if (r === "learner" && announcement) setShowAnnouncement(true);
         }}
         onRegister={(a) => {
@@ -1892,6 +1978,8 @@ export default function App() {
           setSelectedLearner(l);
           setView("learnerDetail");
         }}
+        remove={deleteLearner}
+        resetPasswords={resetAllLearnerPasswords}
       />
     );
   else if (role === "admin" && view === "learnerDetail" && selectedLearner) {
