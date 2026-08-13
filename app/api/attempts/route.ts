@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureSchema } from "../../../lib/db";
 import { readSession } from "../../../lib/auth";
+import { seedQuizzes } from "../../data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +32,8 @@ export async function POST(request: Request) {
     const sql = await ensureSchema();
     const stateRows =
       await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
-    const quiz = stateRows[0]?.data?.quizzes?.find(
+    const availableQuizzes = stateRows[0]?.data?.quizzes || seedQuizzes;
+    const quiz = availableQuizzes.find(
       (item: any) => item.id === attempt.quizId,
     );
     if (!quiz || quiz.status !== "Published")

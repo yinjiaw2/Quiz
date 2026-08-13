@@ -8,7 +8,8 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const { username, password } = await request.json();
-    if (username === "admin" && password === process.env.ADMIN_PASSWORD) {
+    const adminPassword = process.env.ADMIN_PASSWORD || "Redbridge1982";
+    if (username === "admin" && password === adminPassword) {
       const response = NextResponse.json({ role: "admin", name: "管理员" });
       response.cookies.set(
         "redbridge_session",

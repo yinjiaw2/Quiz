@@ -107,6 +107,9 @@ function Login({
   };
   const submit = async () => {
     const user = username.trim();
+    const localPreview =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
     setError("");
     if (!user || !password) {
       setError("请输入用户名和密码");
@@ -135,7 +138,7 @@ function Login({
         });
         if (!response.ok) {
           const body = await response.json();
-          if (response.status !== 503) {
+          if (response.status !== 503 || !localPreview) {
             setError(body.error || "注册失败");
             return;
           }
@@ -167,13 +170,16 @@ function Login({
         }
         return;
       }
-      if (response.status !== 503) {
+      if (response.status !== 503 || !localPreview) {
         const body = await response.json();
-        setError(body.error || "用户名或密码不正确");
+        setError(
+          body.error ||
+            "后端服务未配置，请检查 Vercel 的数据库环境变量后重新部署",
+        );
         return;
       }
     } catch {}
-    if (user === "admin" && password === "Redbridge1982") {
+    if (localPreview && user === "admin" && password === "Redbridge1982") {
       activeLearnerName = "";
       onLogin("admin");
       return;
@@ -183,10 +189,11 @@ function Login({
         a.username.toLowerCase() === user.toLowerCase() &&
         a.password === password,
     );
-    if (found) {
+    if (localPreview && found) {
       activeLearnerName = found.name;
       onLogin("learner", found);
-    } else setError("用户名或密码不正确");
+    } else if (localPreview) setError("用户名或密码不正确");
+    else setError("无法连接后端，请检查 Vercel 数据库环境变量并重新部署");
   };
   return (
     <main className="min-h-screen bg-[#eef4ef] p-5">
@@ -1808,7 +1815,13 @@ export default function App() {
                 maxAttempts: active.maxAttempts ?? 1,
               }),
             });
-            if (!response.ok && response.status !== 503) {
+            const localPreview =
+              window.location.hostname === "localhost" ||
+              window.location.hostname === "127.0.0.1";
+            const canUseLocalFallback =
+              localPreview &&
+              (response.status === 401 || response.status === 503);
+            if (!response.ok && !canUseLocalFallback) {
               const body = await response.json();
               alert(body.error || "成绩提交失败");
               setView("quizzes");
