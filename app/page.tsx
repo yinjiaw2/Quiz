@@ -676,6 +676,7 @@ function LearnerManagement({
                     >
                       <select
                         aria-label={`编辑${l.name}的部门`}
+                        title="修改学员所属部门"
                         className="input max-w-40 py-2"
                         value={
                           ["销售", "运营"].includes(l.department)
@@ -701,15 +702,18 @@ function LearnerManagement({
                     <td className="px-5">
                       <div className="flex items-center gap-3">
                         <button
-                          className="flex items-center gap-1 text-sm font-semibold text-brand"
+                          aria-label="查看考试记录"
+                          data-tooltip="查看考试记录"
+                          className="icon-action flex items-center gap-1 text-sm font-semibold text-brand"
                           onClick={() => open(l)}
                         >
                           查看记录
                           <ChevronRight size={16} />
                         </button>
                         <button
-                          className="rounded-lg p-2 text-amber-600 hover:bg-amber-50"
-                          title="重置密码为 123456"
+                          aria-label="重置密码为 123456"
+                          data-tooltip="重置密码为 123456"
+                          className="icon-action text-amber-600 hover:bg-amber-50"
                           onClick={(event) => {
                             event.stopPropagation();
                             resetPassword(l);
@@ -718,8 +722,9 @@ function LearnerManagement({
                           <Settings2 size={16} />
                         </button>
                         <button
-                          className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"
-                          title="删除学员"
+                          aria-label="删除学员"
+                          data-tooltip="删除学员"
+                          className="icon-action text-rose-600 hover:bg-rose-50"
                           onClick={(event) => {
                             event.stopPropagation();
                             remove(l);
