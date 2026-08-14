@@ -51,6 +51,15 @@ const fmtDate = (v: string) =>
     month: "short",
     day: "numeric",
   }).format(new Date(v));
+const fmtDateTime = (v: string) =>
+  new Intl.DateTimeFormat("zh-CN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(v));
 const badge = (s: string) =>
   s === "Passed" || s === "Published"
     ? "bg-emerald-50 text-emerald-700"
@@ -561,6 +570,7 @@ function ResultTable({
               "答对题数",
               "用时",
               "违规次数",
+              "提交日期",
               "状态",
             ].map((x) => (
               <th className="px-5 py-3 font-semibold" key={x}>
@@ -591,6 +601,9 @@ function ResultTable({
               <td className="px-5 py-4 text-slate-600">{a.timeUsed} 分钟</td>
               <td className="px-5 py-4 text-slate-600">
                 {a.tabSwitches + a.fullscreenExits}
+              </td>
+              <td className="whitespace-nowrap px-5 py-4 text-slate-600">
+                {fmtDateTime(a.date)}
               </td>
               <td className="px-5 py-4">
                 <span
