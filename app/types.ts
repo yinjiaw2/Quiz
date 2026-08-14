@@ -18,6 +18,7 @@ export type Quiz = {
   questions: Question[];
   showScore: boolean;
   answerRelease: "immediate" | "deadline" | "never";
+  resultsReleased: boolean;
   requireFullscreen: boolean;
   detectTabSwitch: boolean;
   detectFullscreenExit: boolean;

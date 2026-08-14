@@ -15,6 +15,7 @@ export async function GET() {
         quizzes: seedQuizzes,
         learnerRecords: [],
         announcement: "",
+        announcementPersistent: false,
       };
       rows = await sql`
         INSERT INTO redbridge_state (id, data)

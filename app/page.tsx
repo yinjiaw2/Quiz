@@ -823,6 +823,12 @@ function AdminQuizzes({
           : q,
       ),
     );
+  const toggleResults = (id: string) =>
+    setQuizzes(
+      quizzes.map((q) =>
+        q.id === id ? { ...q, resultsReleased: !q.resultsReleased } : q,
+      ),
+    );
   return (
     <>
       <PageTitle
@@ -878,15 +884,21 @@ function AdminQuizzes({
                   <td className="px-5">
                     <div className="flex gap-1">
                       <button
-                        title="编辑"
-                        className="rounded-lg p-2 hover:bg-slate-100"
+                        aria-label="编辑考核"
+                        data-tooltip="编辑考核"
+                        className="icon-action"
                         onClick={() => edit(q)}
                       >
                         <Edit3 size={16} />
                       </button>
                       <button
-                        title={q.status === "Draft" ? "发布" : "取消发布"}
-                        className="rounded-lg p-2 hover:bg-slate-100"
+                        aria-label={
+                          q.status === "Draft" ? "发布考核" : "取消发布"
+                        }
+                        data-tooltip={
+                          q.status === "Draft" ? "发布考核" : "取消发布"
+                        }
+                        className="icon-action"
                         onClick={() => toggle(q.id)}
                       >
                         {q.status === "Draft" ? (
@@ -896,8 +908,25 @@ function AdminQuizzes({
                         )}
                       </button>
                       <button
-                        title="删除"
-                        className="rounded-lg p-2 text-rose-500 hover:bg-rose-50"
+                        aria-label={
+                          q.resultsReleased
+                            ? "收回答案详情"
+                            : "提前发布答案详情"
+                        }
+                        data-tooltip={
+                          q.resultsReleased
+                            ? "收回答案详情"
+                            : "提前发布答案详情"
+                        }
+                        className={`icon-action ${q.resultsReleased ? "bg-emerald-50 text-emerald-700" : ""}`}
+                        onClick={() => toggleResults(q.id)}
+                      >
+                        <CheckCircle2 size={16} />
+                      </button>
+                      <button
+                        aria-label="删除考核"
+                        data-tooltip="删除考核"
+                        className="icon-action text-rose-500 hover:bg-rose-50"
                         onClick={() =>
                           confirm(`确定删除“${q.title}”吗？`) &&
                           setQuizzes(quizzes.filter((x) => x.id !== q.id))
@@ -939,6 +968,7 @@ function Builder({
       questions: buildQuestions(),
       showScore: true,
       answerRelease: "deadline",
+      resultsReleased: false,
       requireFullscreen: true,
       detectTabSwitch: true,
       detectFullscreenExit: true,
@@ -1042,17 +1072,28 @@ function Builder({
                 />
               </div>
               <div>
-                <label className="label">Answer release</label>
+                <label className="label">成绩与答案开放时间</label>
                 <select
                   className="input"
                   value={q.answerRelease}
                   onChange={(e) => update({ answerRelease: e.target.value })}
                 >
-                  <option value="immediate">Immediately</option>
-                  <option value="deadline">After deadline</option>
-                  <option value="never">Never</option>
+                  <option value="immediate">提交后立即开放</option>
+                  <option value="deadline">截止时间后自动开放</option>
+                  <option value="never">不自动开放</option>
                 </select>
               </div>
+              <label className="flex items-center gap-3 rounded-xl bg-emerald-50 p-3 text-sm font-semibold text-emerald-800 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={q.resultsReleased ?? false}
+                  onChange={(e) =>
+                    update({ resultsReleased: e.target.checked })
+                  }
+                  className="h-4 w-4 accent-[#2f6e55]"
+                />
+                提前发布作答情况（开启后学员可立即查看答案详情）
+              </label>
             </div>
           </section>
           <section className="card p-6">
@@ -1616,8 +1657,10 @@ function ResultDetail({
 }) {
   const canReview =
     admin ||
+    quiz.resultsReleased ||
     quiz.answerRelease === "immediate" ||
-    new Date() > new Date(quiz.deadline);
+    (quiz.answerRelease === "deadline" &&
+      new Date().getTime() >= new Date(quiz.deadline).getTime());
   return (
     <>
       <button
@@ -1722,6 +1765,9 @@ export default function App() {
     useState<LearnerRecord[]>(learners);
   const [announcement, setAnnouncement] = useState("");
   const [announcementDraft, setAnnouncementDraft] = useState("");
+  const [announcementPersistent, setAnnouncementPersistent] = useState(false);
+  const [announcementPersistentDraft, setAnnouncementPersistentDraft] =
+    useState(false);
   const [announceEditor, setAnnounceEditor] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [view, setView] = useState<View>("dashboard");
@@ -1755,6 +1801,7 @@ export default function App() {
           (s.quizzes || seedQuizzes).map((q: Quiz) => ({
             ...q,
             maxAttempts: q.maxAttempts ?? 1,
+            resultsReleased: q.resultsReleased ?? false,
           })),
         );
         if (!savedAttempts.length) savedAttempts = s.attempts || seedAttempts;
@@ -1768,6 +1815,7 @@ export default function App() {
         );
         setLearnerRecords(s.learnerRecords || learners);
         setAnnouncement(s.announcement || "");
+        setAnnouncementPersistent(s.announcementPersistent || false);
         setAccounts(
           (s.accounts || [])
             .filter((a: any) => a.role !== "admin")
@@ -1785,6 +1833,7 @@ export default function App() {
           setAttempts(s.attempts || seedAttempts);
           setLearnerRecords(s.learnerRecords || learners);
           setAnnouncement(s.announcement || "");
+          setAnnouncementPersistent(s.announcementPersistent || false);
           setAccounts(s.accounts || []);
         }
       } finally {
@@ -1795,16 +1844,29 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!hydrated.current) return;
-    const state = { quizzes, learnerRecords, announcement };
+    const state = {
+      quizzes,
+      learnerRecords,
+      announcement,
+      announcementPersistent,
+    };
     localStorage.setItem(
       "redbridge-state",
       JSON.stringify({ ...state, attempts }),
     );
-  }, [quizzes, attempts, accounts, learnerRecords, announcement]);
+  }, [
+    quizzes,
+    attempts,
+    accounts,
+    learnerRecords,
+    announcement,
+    announcementPersistent,
+  ]);
   const saveSharedState = async (
     nextQuizzes: Quiz[],
     nextLearners: LearnerRecord[],
     nextAnnouncement: string,
+    nextAnnouncementPersistent = announcementPersistent,
   ) => {
     const response = await fetch("/api/state", {
       method: "PUT",
@@ -1813,6 +1875,7 @@ export default function App() {
         quizzes: nextQuizzes,
         learnerRecords: nextLearners,
         announcement: nextAnnouncement,
+        announcementPersistent: nextAnnouncementPersistent,
       }),
     });
     if (!response.ok) {
@@ -1835,6 +1898,23 @@ export default function App() {
       setLearnerRecords(previous);
       alert(`${error.message}，本次部门修改已撤销。`);
     });
+  };
+  const shouldShowCurrentAnnouncement = () =>
+    Boolean(
+      announcement &&
+      (announcementPersistent ||
+        localStorage.getItem(
+          `redbridge-announcement-seen:${activeLearnerName}`,
+        ) !== announcement),
+    );
+  const closeLearnerAnnouncement = () => {
+    if (!announcementPersistent && announcement) {
+      localStorage.setItem(
+        `redbridge-announcement-seen:${activeLearnerName}`,
+        announcement,
+      );
+    }
+    setShowAnnouncement(false);
   };
   const refreshRemoteAttempts = async () => {
     try {
@@ -1920,7 +2000,8 @@ export default function App() {
           setView("dashboard");
           void refreshRemoteAttempts();
           if (r === "admin") void refreshRemoteLearners();
-          if (r === "learner" && announcement) setShowAnnouncement(true);
+          if (r === "learner" && shouldShowCurrentAnnouncement())
+            setShowAnnouncement(true);
         }}
         onRegister={(a) => {
           setAccounts([...accounts, a]);
@@ -1936,7 +2017,7 @@ export default function App() {
           setRole("learner");
           setView("dashboard");
           void refreshRemoteAttempts();
-          if (announcement) setShowAnnouncement(true);
+          if (shouldShowCurrentAnnouncement()) setShowAnnouncement(true);
         }}
       />
     );
@@ -2153,6 +2234,7 @@ export default function App() {
         logout={() => setRole(null)}
         onAnnounce={() => {
           setAnnouncementDraft(announcement);
+          setAnnouncementPersistentDraft(announcementPersistent);
           setAnnounceEditor(true);
         }}
       >
@@ -2179,6 +2261,17 @@ export default function App() {
               onChange={(e) => setAnnouncementDraft(e.target.value)}
               placeholder="请输入公告内容"
             />
+            <label className="mt-4 flex items-center gap-3 rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={announcementPersistentDraft}
+                onChange={(e) =>
+                  setAnnouncementPersistentDraft(e.target.checked)
+                }
+                className="h-4 w-4 accent-[#2f6e55]"
+              />
+              长期显示（学员每次重新登录都会弹出）
+            </label>
             <div className="mt-5 flex justify-end gap-2">
               <Dialog.Close className="btn-secondary">取消</Dialog.Close>
               <button
@@ -2191,8 +2284,10 @@ export default function App() {
                       quizzes,
                       learnerRecords,
                       nextAnnouncement,
+                      announcementPersistentDraft,
                     );
                     setAnnouncement(nextAnnouncement);
+                    setAnnouncementPersistent(announcementPersistentDraft);
                     setAnnounceEditor(false);
                   } catch (error) {
                     alert(
@@ -2207,7 +2302,13 @@ export default function App() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-      <Dialog.Root open={showAnnouncement} onOpenChange={setShowAnnouncement}>
+      <Dialog.Root
+        open={showAnnouncement}
+        onOpenChange={(open) => {
+          if (!open) closeLearnerAnnouncement();
+          else setShowAnnouncement(true);
+        }}
+      >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/50" />
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl">
