@@ -1745,12 +1745,7 @@ export default function App() {
         if (stateResponse.ok) s = await stateResponse.json();
         if (attemptsResponse.ok) {
           const remoteAttempts: Attempt[] = await attemptsResponse.json();
-          savedAttempts = [
-            ...remoteAttempts,
-            ...seedAttempts.filter(
-              (seed) => !remoteAttempts.some((remote) => remote.id === seed.id),
-            ),
-          ];
+          savedAttempts = remoteAttempts;
         }
         if (!s) {
           const raw = localStorage.getItem("redbridge-state");
@@ -1846,12 +1841,7 @@ export default function App() {
       const response = await fetch("/api/attempts", { cache: "no-store" });
       if (!response.ok) return;
       const remote: Attempt[] = await response.json();
-      setAttempts([
-        ...remote,
-        ...seedAttempts.filter(
-          (seed) => !remote.some((attempt) => attempt.id === seed.id),
-        ),
-      ]);
+      setAttempts(remote);
     } catch {}
   };
   const refreshRemoteLearners = async () => {
@@ -2066,18 +2056,7 @@ export default function App() {
   } else if (view === "results") {
     const rows =
       role === "learner"
-        ? attempts
-            .filter(
-              (a) =>
-                a.learner === activeLearnerName ||
-                (!["a1", "a2", "a3"].includes(a.id) &&
-                  a.learner === "Eric Zhang"),
-            )
-            .map((a) =>
-              a.learner === "Eric Zhang"
-                ? { ...a, learner: activeLearnerName }
-                : a,
-            )
+        ? attempts.filter((a) => a.learner === activeLearnerName)
         : attempts;
     content = (
       <>

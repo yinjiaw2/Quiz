@@ -13,7 +13,7 @@ export async function GET() {
     if (!rows.length) {
       const initialData = {
         quizzes: seedQuizzes,
-        learnerRecords: learners,
+        learnerRecords: [],
         announcement: "",
       };
       rows = await sql`
@@ -26,7 +26,11 @@ export async function GET() {
     const users =
       await sql`SELECT username, name FROM redbridge_users ORDER BY created_at`;
     const data = rows[0].data;
-    const existing = data.learnerRecords || [];
+    const demoEmails = new Set(learners.map((learner) => learner.email));
+    const originalLearners = data.learnerRecords || [];
+    const existing = originalLearners.filter(
+      (learner: any) => !demoEmails.has(learner.email),
+    );
     const learnerRecords = [
       ...existing,
       ...users
@@ -41,6 +45,14 @@ export async function GET() {
           completed: 0,
         })),
     ];
+    if (existing.length !== originalLearners.length) {
+      data.learnerRecords = learnerRecords;
+      await sql`
+        UPDATE redbridge_state
+        SET data = ${JSON.stringify(data)}::jsonb, updated_at = NOW()
+        WHERE id = 'main'
+      `;
+    }
     return NextResponse.json({ ...data, learnerRecords });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 503 });
