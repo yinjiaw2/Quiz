@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureSchema } from "../../../lib/db";
 import { readSession } from "../../../lib/auth";
+import { learners, seedQuizzes } from "../../data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,11 +9,23 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const sql = await ensureSchema();
-    const rows = await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
+    let rows = await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
+    if (!rows.length) {
+      const initialData = {
+        quizzes: seedQuizzes,
+        learnerRecords: learners,
+        announcement: "",
+      };
+      rows = await sql`
+        INSERT INTO redbridge_state (id, data)
+        VALUES ('main', ${JSON.stringify(initialData)}::jsonb)
+        ON CONFLICT (id) DO UPDATE SET data = redbridge_state.data
+        RETURNING data
+      `;
+    }
     const users =
       await sql`SELECT username, name FROM redbridge_users ORDER BY created_at`;
-    const data = rows[0]?.data ?? null;
-    if (!data) return NextResponse.json(null);
+    const data = rows[0].data;
     const existing = data.learnerRecords || [];
     const learnerRecords = [
       ...existing,

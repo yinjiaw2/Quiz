@@ -49,24 +49,43 @@ export async function DELETE(request: Request) {
     `;
     if (!rows.length)
       return NextResponse.json({ error: "学员不存在" }, { status: 404 });
+    const stateRows =
+      await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
+    if (stateRows.length) {
+      const data = stateRows[0].data;
+      data.learnerRecords = (data.learnerRecords || []).filter(
+        (learner: any) => learner.email !== String(username).toLowerCase(),
+      );
+      await sql`
+        UPDATE redbridge_state
+        SET data = ${JSON.stringify(data)}::jsonb, updated_at = NOW()
+        WHERE id = 'main'
+      `;
+    }
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 503 });
   }
 }
 
-export async function PATCH() {
+export async function PATCH(request: Request) {
   try {
     if (!(await requireAdmin()))
       return NextResponse.json({ error: "无权重置密码" }, { status: 403 });
     const sql = await ensureSchema();
+    const { username } = await request.json();
+    if (!username)
+      return NextResponse.json({ error: "缺少用户名" }, { status: 400 });
     const passwordHash = await hash("123456", 12);
     const rows = await sql`
       UPDATE redbridge_users
       SET password_hash = ${passwordHash}
+      WHERE username = ${String(username).toLowerCase()}
       RETURNING username
     `;
-    return NextResponse.json({ ok: true, count: rows.length });
+    if (!rows.length)
+      return NextResponse.json({ error: "学员不存在" }, { status: 404 });
+    return NextResponse.json({ ok: true, username: rows[0].username });
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 503 });
   }

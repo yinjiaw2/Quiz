@@ -12,7 +12,7 @@ npm run dev
 
 1. 将项目导入 Vercel。
 2. 在项目的 **Storage / Marketplace** 中添加 Neon Postgres，并连接到当前项目。
-3. 确认 Vercel 已生成 `DATABASE_URL` 环境变量。
+3. 确认 Vercel 已生成 `DATABASE_URL`。如果该名称已经存在，把连接页面的 Custom Prefix 改为 `NEON`，应用会读取 `NEON_URL`。
 4. 在 Vercel 项目 Settings → Environment Variables 中添加：
 
 ```text
