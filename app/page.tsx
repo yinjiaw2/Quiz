@@ -1189,12 +1189,39 @@ function LearnerDashboard({
   start: (q: Quiz) => void;
   setView: (v: View) => void;
 }) {
+  const learnerAttempts = attempts.filter(
+    (attempt) => attempt.learner === activeLearnerName,
+  );
+  const publishedQuizzes = quizzes.filter(
+    (quiz) => quiz.status === "Published",
+  );
+  const completedQuizIds = new Set(
+    learnerAttempts.map((attempt) => attempt.quizId),
+  );
+  const completedCount = publishedQuizzes.filter((quiz) =>
+    completedQuizIds.has(quiz.id),
+  ).length;
+  const averageScore = learnerAttempts.length
+    ? Math.round(
+        learnerAttempts.reduce((sum, attempt) => sum + attempt.score, 0) /
+          learnerAttempts.length,
+      )
+    : 0;
+  const completionRate = publishedQuizzes.length
+    ? Math.round((completedCount / publishedQuizzes.length) * 100)
+    : 0;
+  const waitingCount = publishedQuizzes.length - completedCount;
   return (
     <>
       <PageTitle
-        eyebrow="Thursday, 13 August"
-        title="Welcome back, Eric"
-        desc="Keep your training on track. You have 2 quizzes waiting."
+        eyebrow={new Intl.DateTimeFormat("zh-CN", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          weekday: "long",
+        }).format(new Date())}
+        title={`欢迎回来，${activeLearnerName || "学员"}`}
+        desc={`保持学习进度，你还有 ${waitingCount} 项考核待完成。`}
       />
       <div className="mb-7 rounded-2xl bg-brand p-6 text-white">
         <div className="flex items-start gap-4">
@@ -1203,36 +1230,38 @@ function LearnerDashboard({
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-emerald-200">
-              New assignment
+              最新考核
             </p>
             <h2 className="mt-1 text-xl font-bold">
-              Weekly product quiz is now available
+              {publishedQuizzes[0]?.title || "暂无可参加的考核"}
             </h2>
             <p className="mt-1 text-sm text-emerald-100">
-              Please complete Product Knowledge Quiz 03 before Friday at 5 PM.
+              {publishedQuizzes[0]
+                ? `请在 ${fmtDate(publishedQuizzes[0].deadline)} 前完成。`
+                : "管理员发布新考核后会显示在这里。"}
             </p>
           </div>
         </div>
       </div>
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">Available quizzes</h2>
+        <h2 className="text-xl font-bold">可参加的考核</h2>
         <button
           className="text-sm font-semibold text-brand"
           onClick={() => setView("quizzes")}
         >
-          View all
+          查看全部
         </button>
       </div>
       <div className="mt-4 grid gap-5 lg:grid-cols-2">
         {quizzes
           .filter((q) => q.status === "Published")
-          .map((q, i) => (
+          .map((q) => (
             <article className="card p-6" key={q.id}>
               <div className="flex justify-between">
                 <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-bold ${i === 0 ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}
+                  className={`rounded-full px-2.5 py-1 text-xs font-bold ${completedQuizIds.has(q.id) ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}
                 >
-                  {i === 0 ? "Not started" : "Due soon"}
+                  {completedQuizIds.has(q.id) ? "已参加" : "未开始"}
                 </span>
                 <MoreHorizontal className="text-slate-400" size={20} />
               </div>
@@ -1243,16 +1272,16 @@ function LearnerDashboard({
               <div className="my-5 flex gap-5 border-y border-slate-100 py-4 text-sm text-slate-600">
                 <span className="flex items-center gap-1.5">
                   <BookOpenCheck size={16} />
-                  {q.questions.length} questions
+                  {q.questions.length} 道题
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Clock3 size={16} />
-                  {q.timeLimit} min
+                  {q.timeLimit} 分钟
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400">DUE DATE</p>
+                  <p className="text-xs text-slate-400">截止日期</p>
                   <p className="mt-1 text-sm font-semibold">
                     {fmtDate(q.deadline)}
                   </p>
@@ -1280,26 +1309,26 @@ function LearnerDashboard({
       </div>
       <section className="card mt-7 p-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-bold">Your progress</h2>
+          <h2 className="font-bold">我的进度</h2>
           <button
             className="text-sm font-semibold text-brand"
             onClick={() => setView("results")}
           >
-            View results
+            查看成绩
           </button>
         </div>
         <div className="mt-5 grid gap-5 sm:grid-cols-3">
           <div>
-            <p className="text-2xl font-bold">8</p>
-            <p className="text-sm text-slate-500">Completed quizzes</p>
+            <p className="text-2xl font-bold">{completedCount}</p>
+            <p className="text-sm text-slate-500">已完成考核</p>
           </div>
           <div>
-            <p className="text-2xl font-bold">87%</p>
-            <p className="text-sm text-slate-500">Average score</p>
+            <p className="text-2xl font-bold">{averageScore}%</p>
+            <p className="text-sm text-slate-500">平均分</p>
           </div>
           <div>
-            <p className="text-2xl font-bold">100%</p>
-            <p className="text-sm text-slate-500">Completion rate</p>
+            <p className="text-2xl font-bold">{completionRate}%</p>
+            <p className="text-sm text-slate-500">完成率</p>
           </div>
         </div>
       </section>
