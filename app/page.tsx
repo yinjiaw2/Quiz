@@ -982,6 +982,10 @@ function Builder({
     },
   );
   const [idx, setIdx] = useState(0);
+  const [titleError, setTitleError] = useState("");
+  const [questionError, setQuestionError] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
+  const questionSectionRef = useRef<HTMLElement>(null);
   const question = q.questions[idx];
   const update = (patch: any) => setQ({ ...q, ...patch });
   const uq = (patch: any) =>
@@ -991,6 +995,39 @@ function Builder({
         i === idx ? { ...x, ...patch } : x,
       ),
     });
+  const validateAndSave = () => {
+    setTitleError("");
+    setQuestionError("");
+    if (!q.title.trim()) {
+      setTitleError("请先填写考核标题，然后才能保存。 ");
+      requestAnimationFrame(() => {
+        titleRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        titleRef.current?.focus();
+      });
+      return;
+    }
+    const invalidQuestion = q.questions.findIndex(
+      (item) =>
+        !item.text.trim() || item.options.some((option) => !option.trim()),
+    );
+    if (invalidQuestion !== -1) {
+      setIdx(invalidQuestion);
+      setQuestionError(
+        `第 ${invalidQuestion + 1} 题内容不完整，请填写题目和所有选项。`,
+      );
+      requestAnimationFrame(() =>
+        questionSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        }),
+      );
+      return;
+    }
+    onSave(q);
+  };
   return (
     <>
       <PageTitle
@@ -1002,11 +1039,7 @@ function Builder({
             <button className="btn-secondary" onClick={onCancel}>
               Cancel
             </button>
-            <button
-              className="btn-primary"
-              disabled={!q.title.trim()}
-              onClick={() => onSave(q)}
-            >
+            <button className="btn-primary" onClick={validateAndSave}>
               <Check size={17} />
               Save quiz
             </button>
@@ -1021,11 +1054,21 @@ function Builder({
               <div className="sm:col-span-2">
                 <label className="label">Quiz title</label>
                 <input
-                  className="input"
+                  ref={titleRef}
+                  className={`input ${titleError ? "border-rose-500 bg-rose-50 ring-2 ring-rose-100" : ""}`}
                   value={q.title}
-                  onChange={(e) => update({ title: e.target.value })}
+                  onChange={(e) => {
+                    update({ title: e.target.value });
+                    if (e.target.value.trim()) setTitleError("");
+                  }}
                   placeholder="e.g. Product Knowledge Quiz 04"
                 />
+                {titleError && (
+                  <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold text-rose-600">
+                    <AlertTriangle size={15} />
+                    {titleError}
+                  </p>
+                )}
               </div>
               <div className="sm:col-span-2">
                 <label className="label">Description</label>
@@ -1045,15 +1088,32 @@ function Builder({
                 />
               </div>
               <div>
-                <label className="label">Passing score (%)</label>
-                <input
-                  className="input"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={q.passingScore}
-                  onChange={(e) => update({ passingScore: +e.target.value })}
-                />
+                <label className="label">通过要求（答对题数）</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    max={q.questions.length}
+                    value={Math.round(
+                      (q.passingScore / 100) * q.questions.length,
+                    )}
+                    onChange={(e) => {
+                      const required = Math.min(
+                        q.questions.length,
+                        Math.max(1, +e.target.value),
+                      );
+                      update({
+                        passingScore: Math.round(
+                          (required / q.questions.length) * 100,
+                        ),
+                      });
+                    }}
+                  />
+                  <span className="shrink-0 font-bold text-slate-500">
+                    / {q.questions.length} 题
+                  </span>
+                </div>
               </div>
               <div>
                 <label className="label">Time limit (minutes)</label>
@@ -1101,7 +1161,10 @@ function Builder({
               </label>
             </div>
           </section>
-          <section className="card p-6">
+          <section
+            ref={questionSectionRef}
+            className={`card scroll-mt-28 p-6 ${questionError ? "border-rose-400 ring-2 ring-rose-100" : ""}`}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold uppercase text-brand">
@@ -1111,11 +1174,20 @@ function Builder({
               </div>
               <span className="text-xs text-slate-400">Single choice</span>
             </div>
+            {questionError && (
+              <div className="mt-4 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">
+                <AlertTriangle size={16} />
+                {questionError}
+              </div>
+            )}
             <label className="label mt-5">Question text</label>
             <textarea
               className="input min-h-24"
               value={question.text}
-              onChange={(e) => uq({ text: e.target.value })}
+              onChange={(e) => {
+                uq({ text: e.target.value });
+                setQuestionError("");
+              }}
             />
             <div className="mt-4 grid gap-3">
               {question.options.map((o, oi) => (
@@ -1129,13 +1201,14 @@ function Builder({
                   <input
                     className="input"
                     value={o}
-                    onChange={(e) =>
+                    onChange={(e) => {
                       uq({
                         options: question.options.map((x, j) =>
                           j === oi ? e.target.value : x,
                         ),
-                      })
-                    }
+                      });
+                      setQuestionError("");
+                    }}
                   />
                 </div>
               ))}
@@ -1166,7 +1239,20 @@ function Builder({
             </div>
           </section>
         </div>
-        <aside className="space-y-6">
+        <aside className="space-y-6 xl:sticky xl:top-28 xl:self-start">
+          <section className="card border-brand/20 bg-mint p-5">
+            <h3 className="font-bold text-brand">保存考核</h3>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              系统会检查标题、题目和选项是否完整。
+            </p>
+            <button
+              className="btn-primary mt-4 w-full"
+              onClick={validateAndSave}
+            >
+              <Check size={17} />
+              保存考核
+            </button>
+          </section>
           <section className="card p-5">
             <h3 className="font-bold">Questions</h3>
             <div className="mt-4 grid grid-cols-5 gap-2">
