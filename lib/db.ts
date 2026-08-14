@@ -1,16 +1,33 @@
 import { neon } from "@neondatabase/serverless";
 
 export function database() {
-  const url =
+  const knownUrl =
     process.env.NEON_URL ||
+    process.env.NEON_DATABASE_URL ||
+    process.env.NEON_POSTGRES_URL ||
     process.env.STORAGE_URL ||
+    process.env.STORAGE_DATABASE_URL ||
+    process.env.STORAGE_POSTGRES_URL ||
     process.env.DATABASE_URL ||
     process.env.POSTGRES_URL;
+  const discoveredUrl = Object.entries(process.env).find(
+    ([key, value]) =>
+      /(NEON|STORAGE|DATABASE|POSTGRES).*URL/i.test(key) &&
+      typeof value === "string" &&
+      /^(postgres|postgresql):\/\//i.test(value),
+  )?.[1];
+  const url = knownUrl || discoveredUrl;
   if (!url)
     throw new Error(
-      "NEON_URL, STORAGE_URL, DATABASE_URL or POSTGRES_URL is not configured",
+      "No PostgreSQL connection URL is available in this deployment",
     );
   return neon(url);
+}
+
+export function databaseEnvironmentNames() {
+  return Object.keys(process.env)
+    .filter((key) => /(NEON|STORAGE|DATABASE|POSTGRES).*URL/i.test(key))
+    .sort();
 }
 
 export async function ensureSchema() {
