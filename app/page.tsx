@@ -826,13 +826,28 @@ function LearnerDetail({
 
 function AdminQuizzes({
   quizzes,
+  attempts,
   setQuizzes,
   edit,
 }: {
   quizzes: Quiz[];
+  attempts: Attempt[];
   setQuizzes: (q: Quiz[]) => void;
   edit: (q?: Quiz) => void;
 }) {
+  const statsByQuiz = attempts.reduce<
+    Record<string, { submissions: number; totalScore: number }>
+  >((stats, attempt) => {
+    const current = stats[attempt.quizId] || {
+      submissions: 0,
+      totalScore: 0,
+    };
+    stats[attempt.quizId] = {
+      submissions: current.submissions + 1,
+      totalScore: current.totalScore + attempt.score,
+    };
+    return stats;
+  }, {});
   const toggle = (id: string) =>
     setQuizzes(
       quizzes.map((q) =>
@@ -880,7 +895,7 @@ function AdminQuizzes({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {quizzes.map((q, i) => (
+              {quizzes.map((q) => (
                 <tr key={q.id} className="hover:bg-slate-50">
                   <td className="px-5 py-4">
                     <div className="font-semibold">{q.title}</div>
@@ -897,8 +912,14 @@ function AdminQuizzes({
                   </td>
                   <td className="px-5 text-slate-600">{q.questions.length}</td>
                   <td className="px-5 text-slate-600">{fmtDate(q.deadline)}</td>
-                  <td className="px-5 text-slate-600">{[42, 31, 0][i] ?? 0}</td>
-                  <td className="px-5 font-semibold">{[86, 82, "—"][i]}</td>
+                  <td className="px-5 text-slate-600">
+                    {statsByQuiz[q.id]?.submissions ?? 0}
+                  </td>
+                  <td className="px-5 font-semibold">
+                    {statsByQuiz[q.id]?.submissions
+                      ? `${Math.round(statsByQuiz[q.id].totalScore / statsByQuiz[q.id].submissions)}%`
+                      : "—"}
+                  </td>
                   <td className="px-5">
                     <div className="flex gap-1">
                       <button
@@ -2200,6 +2221,7 @@ export default function App() {
     content = (
       <AdminQuizzes
         quizzes={quizzes}
+        attempts={attempts}
         setQuizzes={updateQuizzesAndSync}
         edit={(q) => {
           setEdit(q);
