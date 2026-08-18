@@ -108,6 +108,7 @@ function Login({
   const [name, setName] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState("");
   const changeMode = (next: "login" | "register") => {
     setMode(next);
@@ -143,7 +144,12 @@ function Login({
         const response = await fetch("/api/auth/register", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: name.trim(), username: user, password }),
+          body: JSON.stringify({
+            name: name.trim(),
+            username: user,
+            password,
+            remember,
+          }),
         });
         if (!response.ok) {
           const body = await response.json();
@@ -161,7 +167,7 @@ function Login({
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user, password }),
+        body: JSON.stringify({ username: user, password, remember }),
       });
       if (response.ok) {
         const body = await response.json();
@@ -266,6 +272,15 @@ function Login({
               }
               onKeyDown={(e) => e.key === "Enter" && submit()}
             />
+            <label className="mt-4 flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-600">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="h-4 w-4 accent-[#2f6e55]"
+              />
+              记住账号并自动登录（30 天）
+            </label>
             {error && (
               <p className="mt-3 text-sm font-medium text-rose-600">{error}</p>
             )}
@@ -1907,10 +1922,12 @@ export default function App() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [stateResponse, attemptsResponse] = await Promise.all([
-          fetch("/api/state", { cache: "no-store" }),
-          fetch("/api/attempts", { cache: "no-store" }),
-        ]);
+        const [stateResponse, attemptsResponse, sessionResponse] =
+          await Promise.all([
+            fetch("/api/state", { cache: "no-store" }),
+            fetch("/api/attempts", { cache: "no-store" }),
+            fetch("/api/auth/session", { cache: "no-store" }),
+          ]);
         let s: any = null;
         let savedAttempts: Attempt[] = [];
         if (stateResponse.ok) s = await stateResponse.json();
@@ -1950,6 +1967,27 @@ export default function App() {
               password: a.password,
             })),
         );
+        if (sessionResponse.ok) {
+          const session: {
+            role: Role;
+            name: string;
+            username: string;
+          } = await sessionResponse.json();
+          activeLearnerName = session.role === "learner" ? session.name : "";
+          setRole(session.role);
+          setView("dashboard");
+          const currentAnnouncement = s.announcement || "";
+          const persistent = s.announcementPersistent || false;
+          const seen = localStorage.getItem(
+            `redbridge-announcement-seen:${session.name}`,
+          );
+          if (
+            session.role === "learner" &&
+            currentAnnouncement &&
+            (persistent || seen !== currentAnnouncement)
+          )
+            setShowAnnouncement(true);
+        }
       } catch {
         const raw = localStorage.getItem("redbridge-state");
         if (raw) {
@@ -2357,7 +2395,12 @@ export default function App() {
         role={role}
         view={view}
         setView={setView}
-        logout={() => setRole(null)}
+        logout={() => {
+          void fetch("/api/auth/logout", { method: "POST" });
+          activeLearnerName = "";
+          setRole(null);
+          setView("dashboard");
+        }}
         onAnnounce={() => {
           setAnnouncementDraft(announcement);
           setAnnouncementPersistentDraft(announcementPersistent);

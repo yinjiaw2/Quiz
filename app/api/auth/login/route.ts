@@ -7,18 +7,17 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const { username, password } = await request.json();
+    const { username, password, remember = false } = await request.json();
     const adminPassword = process.env.ADMIN_PASSWORD || "Redbridge1982";
     if (username === "admin" && password === adminPassword) {
       const response = NextResponse.json({ role: "admin", name: "管理员" });
       response.cookies.set(
         "redbridge_session",
-        await createSession({
-          role: "admin",
-          name: "管理员",
-          username: "admin",
-        }),
-        sessionCookie,
+        await createSession(
+          { role: "admin", name: "管理员", username: "admin" },
+          false,
+        ),
+        sessionCookie(false),
       );
       return response;
     }
@@ -38,12 +37,15 @@ export async function POST(request: Request) {
     });
     response.cookies.set(
       "redbridge_session",
-      await createSession({
-        role: "learner",
-        name: user.name,
-        username: user.username,
-      }),
-      sessionCookie,
+      await createSession(
+        {
+          role: "learner",
+          name: user.name,
+          username: user.username,
+        },
+        Boolean(remember),
+      ),
+      sessionCookie(Boolean(remember)),
     );
     return response;
   } catch {

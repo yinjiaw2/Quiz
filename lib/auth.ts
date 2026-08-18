@@ -15,11 +15,11 @@ function secret() {
   return new TextEncoder().encode(value);
 }
 
-export async function createSession(session: Session) {
+export async function createSession(session: Session, remember = false) {
   return new SignJWT(session)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime(remember ? "30d" : "1d")
     .sign(secret());
 }
 
@@ -34,10 +34,10 @@ export async function readSession(): Promise<Session | null> {
   }
 }
 
-export const sessionCookie = {
+export const sessionCookie = (remember = false) => ({
   httpOnly: true,
   sameSite: "lax" as const,
   secure: process.env.NODE_ENV === "production",
   path: "/",
-  maxAge: 60 * 60 * 24 * 7,
-};
+  ...(remember ? { maxAge: 60 * 60 * 24 * 30 } : {}),
+});

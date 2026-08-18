@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const { username, name, password } = await request.json();
+    const { username, name, password, remember = false } = await request.json();
     if (
       !username?.trim() ||
       !name?.trim() ||
@@ -28,12 +28,15 @@ export async function POST(request: Request) {
     });
     response.cookies.set(
       "redbridge_session",
-      await createSession({
-        role: "learner",
-        name: name.trim(),
-        username: cleanUsername,
-      }),
-      sessionCookie,
+      await createSession(
+        {
+          role: "learner",
+          name: name.trim(),
+          username: cleanUsername,
+        },
+        Boolean(remember),
+      ),
+      sessionCookie(Boolean(remember)),
     );
     return response;
   } catch (error: any) {
