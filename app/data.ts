@@ -89,18 +89,6 @@ export const buildDefaultQuestions = () => [
   ...buildEssayQuestions(2, 11),
 ];
 
-const demoAnswers = (wrongQuestions: number[]) =>
-  Object.fromEntries(
-    buildDefaultQuestions().map((question, index) => [
-      index,
-      question.type === "essay"
-        ? "我会先了解事实和客户的核心诉求，确认影响范围，再根据公司流程提出清晰、可执行的解决方案。同时记录沟通过程，及时向相关负责人汇报，并在问题解决后跟进客户反馈，确保同类问题得到持续改善。"
-        : wrongQuestions.includes(index)
-          ? (question.correct + 1) % question.options.length
-          : question.correct,
-    ]),
-  );
-
 export const seedQuizzes: Quiz[] = [
   {
     id: "sales-foundation-mixed",
@@ -162,53 +150,7 @@ export const seedQuizzes: Quiz[] = [
   },
 ];
 
-export const seedAttempts: Attempt[] = [
-  {
-    id: "a1",
-    quizId: "sales-foundation-mixed",
-    learner: "Eric Zhang",
-    date: "2026-08-06T10:22:00",
-    score: 92,
-    correct: 11,
-    total: 12,
-    timeUsed: 18,
-    answers: demoAnswers([3, 17]),
-    essayGrades: { 10: "Passed", 11: "Passed" },
-    status: "Passed",
-    tabSwitches: 1,
-    fullscreenExits: 0,
-  },
-  {
-    id: "a2",
-    quizId: "operations-scenario-mixed",
-    learner: "Mia Chen",
-    date: "2026-08-10T14:06:00",
-    score: 83,
-    correct: 10,
-    total: 12,
-    timeUsed: 21,
-    answers: demoAnswers([1, 8, 20]),
-    essayGrades: { 10: "Passed", 11: "Passed" },
-    status: "Passed",
-    tabSwitches: 2,
-    fullscreenExits: 1,
-  },
-  {
-    id: "a3",
-    quizId: "workplace-readiness-mixed",
-    learner: "James Wilson",
-    date: "2026-08-11T09:18:00",
-    score: 58,
-    correct: 7,
-    total: 12,
-    timeUsed: 24,
-    answers: demoAnswers([0, 1, 2, 3]),
-    essayGrades: { 10: "Passed", 11: "Failed" },
-    status: "Failed",
-    tabSwitches: 0,
-    fullscreenExits: 0,
-  },
-];
+export const seedAttempts: Attempt[] = [];
 
 export const learners = [
   {

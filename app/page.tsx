@@ -2516,6 +2516,7 @@ export default function App() {
       <Login
         accounts={accounts}
         onLogin={(r) => {
+          setAttempts([]);
           setRole(r);
           setView("dashboard");
           void refreshRemoteAttempts();
@@ -2524,6 +2525,7 @@ export default function App() {
             setShowAnnouncement(true);
         }}
         onRegister={(a) => {
+          setAttempts([]);
           setAccounts([...accounts, a]);
           setLearnerRecords([
             ...learnerRecords,

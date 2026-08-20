@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 const retiredDemoQuizIds = new Set(["product-03", "privacy-101", "conduct"]);
 const currentDemoQuizIds = new Set(seedQuizzes.map((quiz) => quiz.id));
+const attemptsResetVersion = "2026-08-20-clear-all-attempts";
 
 export async function GET() {
   try {
@@ -30,6 +31,12 @@ export async function GET() {
     const users =
       await sql`SELECT username, name FROM redbridge_users ORDER BY created_at`;
     const data = rows[0].data;
+    const shouldResetAttempts =
+      data.attemptsResetVersion !== attemptsResetVersion;
+    if (shouldResetAttempts) {
+      await sql`DELETE FROM redbridge_attempts`;
+      data.attemptsResetVersion = attemptsResetVersion;
+    }
     const storedQuizzes = data.quizzes || [];
     const shouldReplaceRetiredDemos = storedQuizzes.some((quiz: any) =>
       retiredDemoQuizIds.has(quiz.id),
@@ -65,6 +72,7 @@ export async function GET() {
     ];
     if (
       shouldReplaceRetiredDemos ||
+      shouldResetAttempts ||
       existing.length !== originalLearners.length
     ) {
       data.learnerRecords = learnerRecords;
@@ -90,7 +98,8 @@ export async function PUT(request: Request) {
     await sql`
       INSERT INTO redbridge_state (id, data, updated_at)
       VALUES ('main', ${JSON.stringify(data)}::jsonb, NOW())
-      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = NOW()
+      ON CONFLICT (id) DO UPDATE
+      SET data = redbridge_state.data || EXCLUDED.data, updated_at = NOW()
     `;
     return NextResponse.json({ ok: true });
   } catch (error) {
