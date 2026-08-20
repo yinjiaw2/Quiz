@@ -756,10 +756,12 @@ function LearnerManagement({
                     <td className="px-5">
                       <div className="flex items-center gap-3">
                         <a
-                          aria-label={`导出${l.name}的全部作答情况`}
-                          data-tooltip="导出该学员的全部作答情况"
+                          aria-label={`打印${l.name}的全部作答情况`}
+                          data-tooltip="按 A4 打印或保存该学员的全部作答"
                           className="icon-action"
                           href={`/api/admin/export?learner=${encodeURIComponent(l.name)}`}
+                          target="_blank"
+                          rel="noreferrer"
                           onClick={(event) => event.stopPropagation()}
                         >
                           <Download size={16} />
@@ -840,9 +842,11 @@ function LearnerDetail({
           <a
             className="btn-primary"
             href={`/api/admin/export?learner=${encodeURIComponent(learner.name)}`}
+            target="_blank"
+            rel="noreferrer"
           >
             <Download size={17} />
-            导出该学员全部作答
+            A4 打印 / 保存 PDF
           </a>
         }
       />
@@ -989,10 +993,12 @@ function AdminQuizzes({
                   <td className="px-5">
                     <div className="flex gap-1">
                       <a
-                        aria-label={`导出“${q.title}”的考核结果`}
-                        data-tooltip="单独导出此考核结果"
+                        aria-label={`打印“${q.title}”的考核结果`}
+                        data-tooltip="按 A4 打印或保存此考核结果"
                         className="icon-action"
                         href={`/api/admin/export?quizId=${encodeURIComponent(q.id)}`}
+                        target="_blank"
+                        rel="noreferrer"
                       >
                         <Download size={16} />
                       </a>
