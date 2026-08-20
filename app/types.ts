@@ -6,6 +6,13 @@ export type Question = {
   options: string[];
   correct: number;
   explanation: string;
+  wordLimit?: number;
+};
+export type QuestionBank = {
+  id: string;
+  title: string;
+  description: string;
+  questions: Question[];
 };
 export type Quiz = {
   id: string;

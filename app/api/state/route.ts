@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureSchema } from "../../../lib/db";
 import { readSession } from "../../../lib/auth";
-import { learners, seedQuizzes } from "../../data";
+import { learners, seedQuestionBanks, seedQuizzes } from "../../data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,6 +17,7 @@ export async function GET() {
     if (!rows.length) {
       const initialData = {
         quizzes: seedQuizzes,
+        questionBanks: seedQuestionBanks,
         learnerRecords: [],
         announcement: "",
         announcementPersistent: false,
@@ -31,6 +32,8 @@ export async function GET() {
     const users =
       await sql`SELECT username, name FROM redbridge_users ORDER BY created_at`;
     const data = rows[0].data;
+    const shouldInitializeQuestionBanks = !Array.isArray(data.questionBanks);
+    if (shouldInitializeQuestionBanks) data.questionBanks = seedQuestionBanks;
     const shouldResetAttempts =
       data.attemptsResetVersion !== attemptsResetVersion;
     if (shouldResetAttempts) {
@@ -73,6 +76,7 @@ export async function GET() {
     if (
       shouldReplaceRetiredDemos ||
       shouldResetAttempts ||
+      shouldInitializeQuestionBanks ||
       existing.length !== originalLearners.length
     ) {
       data.learnerRecords = learnerRecords;

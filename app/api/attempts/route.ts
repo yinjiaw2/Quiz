@@ -37,33 +37,18 @@ export async function GET() {
     if (session.role === "admin")
       return NextResponse.json(rows.map((row) => row.data));
 
-    const stateRows =
-      await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
-    const quizzes = stateRows[0]?.data?.quizzes || seedQuizzes;
     const safeAttempts = rows.map((row) => {
       const stored = row.data;
-      const quiz = quizzes.find((item: any) => item.id === stored.quizId);
-      const questions = stored.questionSnapshot || quiz?.questions || [];
-      const choiceQuestions = questions
-        .map((question: any, index: number) => ({ question, index }))
-        .filter(
-          ({ question }: any) => (question.type || "choice") === "choice",
-        );
-      const correct = choiceQuestions.filter(
-        ({ question, index }: any) =>
-          stored.answers?.[index] === question.correct,
-      ).length;
-      const total = choiceQuestions.length;
-      const score = total ? Math.round((correct / total) * 100) : 0;
-      const passingScore =
-        stored.passingScoreSnapshot ?? quiz?.passingScore ?? 0;
-      const { essayGrades, essayComments, essayGraders, ...safe } = stored;
+      const safe = { ...stored };
+      delete safe.essayGrades;
+      delete safe.essayComments;
+      delete safe.essayGraders;
       return {
         ...safe,
-        correct,
-        total,
-        score,
-        status: score >= passingScore ? "Passed" : "Failed",
+        correct: 0,
+        total: 0,
+        score: 0,
+        status: "Pending",
       };
     });
     return NextResponse.json(safeAttempts);
@@ -132,7 +117,15 @@ export async function POST(request: Request) {
         { error: `已达到最多 ${limit} 次答题限制` },
         { status: 409 },
       );
-    return NextResponse.json(rows[0].data, { status: 201 });
+    const learnerResponse = { ...rows[0].data };
+    delete learnerResponse.essayGrades;
+    delete learnerResponse.essayComments;
+    delete learnerResponse.essayGraders;
+    learnerResponse.correct = 0;
+    learnerResponse.total = 0;
+    learnerResponse.score = 0;
+    learnerResponse.status = "Pending";
+    return NextResponse.json(learnerResponse, { status: 201 });
   } catch (error: any) {
     const duplicate = error?.code === "23505";
     return NextResponse.json(

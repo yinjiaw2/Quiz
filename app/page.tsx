@@ -36,16 +36,18 @@ import {
   buildEssayQuestions,
   buildQuestions,
   learners,
+  seedQuestionBanks,
   seedAttempts,
   seedQuizzes,
 } from "./data";
-import { Attempt, Quiz, Role } from "./types";
+import { Attempt, QuestionBank, Quiz, Role } from "./types";
 
 type View =
   | "dashboard"
   | "quizzes"
   | "results"
   | "learners"
+  | "banks"
   | "learnerDetail"
   | "builder"
   | "take"
@@ -349,13 +351,14 @@ function Shell({
   const admin = [
     { id: "dashboard", label: "管理概览", icon: LayoutDashboard },
     { id: "quizzes", label: "考核管理", icon: BookOpenCheck },
+    { id: "banks", label: "题库管理", icon: BookOpenCheck },
     { id: "results", label: "考核结果", icon: BarChart3 },
     { id: "learners", label: "学员管理", icon: Users },
   ];
   const employee = [
     { id: "dashboard", label: "首页", icon: LayoutDashboard },
     { id: "quizzes", label: "我的考核", icon: BookOpenCheck },
-    { id: "results", label: "我的成绩", icon: Trophy },
+    { id: "results", label: "我的记录", icon: Trophy },
   ];
   const links = role === "admin" ? admin : employee;
   return (
@@ -589,26 +592,31 @@ function ResultTable({
   attempts,
   names,
   onOpen,
+  hideScores = false,
 }: {
   attempts: Attempt[];
   names: Record<string, string>;
   onOpen?: (a: Attempt) => void;
+  hideScores?: boolean;
 }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[760px] text-left text-sm">
         <thead className="bg-slate-50 text-xs tracking-wide text-slate-500">
           <tr>
-            {[
-              "学员",
-              "考核",
-              "分数",
-              "答对题数",
-              "用时",
-              "违规次数",
-              "提交日期",
-              "状态",
-            ].map((x) => (
+            {(hideScores
+              ? ["学员", "考核", "用时", "违规次数", "提交日期", "状态"]
+              : [
+                  "学员",
+                  "考核",
+                  "分数",
+                  "答对题数",
+                  "用时",
+                  "违规次数",
+                  "提交日期",
+                  "状态",
+                ]
+            ).map((x) => (
               <th className="px-5 py-3 font-semibold" key={x}>
                 {x}
               </th>
@@ -630,14 +638,18 @@ function ResultTable({
               <td className="px-5 py-4 text-slate-600">
                 {names[a.quizId] || "原考核已删除（记录保留）"}
               </td>
-              <td className="px-5 py-4 font-bold">
-                {a.status === "Pending" ? "待评分" : `${a.score}%`}
-              </td>
-              <td className="px-5 py-4 text-slate-600">
-                {a.status === "Pending"
-                  ? "待评分"
-                  : `${a.correct} / ${a.total}`}
-              </td>
+              {!hideScores && (
+                <>
+                  <td className="px-5 py-4 font-bold">
+                    {a.status === "Pending" ? "待评分" : `${a.score}%`}
+                  </td>
+                  <td className="px-5 py-4 text-slate-600">
+                    {a.status === "Pending"
+                      ? "待评分"
+                      : `${a.correct} / ${a.total}`}
+                  </td>
+                </>
+              )}
               <td className="px-5 py-4 text-slate-600">{a.timeUsed} 分钟</td>
               <td className="px-5 py-4 text-slate-600">
                 {a.tabSwitches + a.fullscreenExits}
@@ -649,7 +661,7 @@ function ResultTable({
                 <span
                   className={`rounded-full px-2.5 py-1 text-xs font-bold ${badge(a.status)}`}
                 >
-                  {statusText(a.status)}
+                  {hideScores ? "已提交" : statusText(a.status)}
                 </span>
               </td>
             </tr>
@@ -1065,12 +1077,267 @@ function AdminQuizzes({
   );
 }
 
+function QuestionBankManagement({
+  banks,
+  saveBanks,
+}: {
+  banks: QuestionBank[];
+  saveBanks: (banks: QuestionBank[]) => void;
+}) {
+  const [selectedId, setSelectedId] = useState(banks[0]?.id || "");
+  const selected = banks.find((bank) => bank.id === selectedId) || banks[0];
+  const [draft, setDraft] = useState<QuestionBank | undefined>(selected);
+  useEffect(() => {
+    setDraft(selected ? structuredClone(selected) : undefined);
+  }, [selected?.id, banks]);
+  const updateQuestion = (index: number, patch: any) => {
+    if (!draft) return;
+    setDraft({
+      ...draft,
+      questions: draft.questions.map((question, questionIndex) =>
+        questionIndex === index ? { ...question, ...patch } : question,
+      ),
+    });
+  };
+  const addBank = () => {
+    const bank: QuestionBank = {
+      id: crypto.randomUUID(),
+      title: "新题库",
+      description: "",
+      questions: [],
+    };
+    saveBanks([...banks, bank]);
+    setSelectedId(bank.id);
+    setDraft(bank);
+  };
+  return (
+    <>
+      <PageTitle
+        title="题库管理"
+        desc="创建、编辑和维护选择题与策论题，创建考核时可直接导入。"
+        action={
+          <button className="btn-primary" onClick={addBank}>
+            <Plus size={17} />
+            新建题库
+          </button>
+        }
+      />
+      <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
+        <aside className="card h-fit p-4">
+          <h2 className="px-2 font-bold">全部题库</h2>
+          <div className="mt-3 space-y-2">
+            {banks.map((bank) => (
+              <button
+                key={bank.id}
+                className={`w-full rounded-xl px-3 py-3 text-left ${bank.id === selected?.id ? "bg-mint text-brand" : "hover:bg-slate-50"}`}
+                onClick={() => setSelectedId(bank.id)}
+              >
+                <p className="font-semibold">{bank.title}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {bank.questions.length} 道题
+                </p>
+              </button>
+            ))}
+          </div>
+        </aside>
+        {draft ? (
+          <div className="space-y-5">
+            <section className="card p-6">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h2 className="text-xl font-bold">编辑题库</h2>
+                <div className="flex gap-2">
+                  <button
+                    className="btn-secondary text-rose-600"
+                    onClick={() => {
+                      if (!confirm(`确定删除题库“${draft.title}”吗？`)) return;
+                      const next = banks.filter((bank) => bank.id !== draft.id);
+                      saveBanks(next);
+                      setSelectedId(next[0]?.id || "");
+                    }}
+                  >
+                    <Trash2 size={16} />
+                    删除题库
+                  </button>
+                  <button
+                    className="btn-primary"
+                    onClick={() =>
+                      saveBanks(
+                        banks.map((bank) =>
+                          bank.id === draft.id ? draft : bank,
+                        ),
+                      )
+                    }
+                  >
+                    <Check size={16} />
+                    保存题库
+                  </button>
+                </div>
+              </div>
+              <label className="label mt-5">题库名称</label>
+              <input
+                className="input"
+                value={draft.title}
+                onChange={(event) =>
+                  setDraft({ ...draft, title: event.target.value })
+                }
+              />
+              <label className="label mt-4">说明</label>
+              <textarea
+                className="input"
+                value={draft.description}
+                onChange={(event) =>
+                  setDraft({ ...draft, description: event.target.value })
+                }
+              />
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button
+                  className="btn-secondary"
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      questions: [
+                        ...draft.questions,
+                        {
+                          id: Date.now(),
+                          type: "choice",
+                          text: "",
+                          options: ["", "", "", ""],
+                          correct: 0,
+                          explanation: "",
+                        },
+                      ],
+                    })
+                  }
+                >
+                  <Plus size={16} />
+                  增加选择题
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() =>
+                    setDraft({
+                      ...draft,
+                      questions: [
+                        ...draft.questions,
+                        {
+                          id: Date.now(),
+                          type: "essay",
+                          text: "",
+                          options: [],
+                          correct: 0,
+                          explanation: "",
+                          wordLimit: 1000,
+                        },
+                      ],
+                    })
+                  }
+                >
+                  <Plus size={16} />
+                  增加策论题
+                </button>
+              </div>
+            </section>
+            {draft.questions.map((question, index) => (
+              <section className="card p-6" key={question.id}>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="font-bold">
+                    第 {index + 1} 题 ·{" "}
+                    {(question.type ?? "choice") === "choice"
+                      ? "选择题"
+                      : "策论题"}
+                  </h3>
+                  <button
+                    className="icon-action text-rose-600"
+                    data-tooltip="删除此题"
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        questions: draft.questions.filter(
+                          (_, questionIndex) => questionIndex !== index,
+                        ),
+                      })
+                    }
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+                <label className="label mt-4">题干</label>
+                <textarea
+                  className="input min-h-28"
+                  value={question.text}
+                  onChange={(event) =>
+                    updateQuestion(index, { text: event.target.value })
+                  }
+                />
+                {(question.type ?? "choice") === "choice" ? (
+                  <div className="mt-4 space-y-3">
+                    {question.options.map((option, optionIndex) => (
+                      <div
+                        className="flex items-center gap-3"
+                        key={optionIndex}
+                      >
+                        <button
+                          className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-bold ${question.correct === optionIndex ? "bg-brand text-white" : "bg-slate-100 text-slate-500"}`}
+                          onClick={() =>
+                            updateQuestion(index, { correct: optionIndex })
+                          }
+                        >
+                          {String.fromCharCode(65 + optionIndex)}
+                        </button>
+                        <input
+                          className="input"
+                          value={option}
+                          onChange={(event) =>
+                            updateQuestion(index, {
+                              options: question.options.map(
+                                (item, itemIndex) =>
+                                  itemIndex === optionIndex
+                                    ? event.target.value
+                                    : item,
+                              ),
+                            })
+                          }
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 max-w-xs">
+                    <label className="label">最高字数</label>
+                    <input
+                      className="input"
+                      type="number"
+                      min="1"
+                      value={question.wordLimit || 1000}
+                      onChange={(event) =>
+                        updateQuestion(index, {
+                          wordLimit: Math.max(1, +event.target.value),
+                        })
+                      }
+                    />
+                  </div>
+                )}
+              </section>
+            ))}
+          </div>
+        ) : (
+          <div className="card p-10 text-center text-slate-500">
+            暂无题库，请先新建题库。
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
 function Builder({
   initial,
+  questionBanks,
   onSave,
   onCancel,
 }: {
   initial?: Quiz;
+  questionBanks: QuestionBank[];
   onSave: (q: Quiz) => void;
   onCancel: () => void;
 }) {
@@ -1105,6 +1372,7 @@ function Builder({
   );
   const [idx, setIdx] = useState(0);
   const [questionTemplate, setQuestionTemplate] = useState("mixed");
+  const [selectedBank, setSelectedBank] = useState("");
   const [titleError, setTitleError] = useState("");
   const [questionError, setQuestionError] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
@@ -1123,7 +1391,10 @@ function Builder({
     const questions = Array.from({ length: nextCount }, (_, i) =>
       q.questions[i] ? q.questions[i] : blankQuestion(Date.now() + i),
     );
-    setQ({ ...q, questions });
+    setQ({
+      ...q,
+      questions: questions.length ? questions : [blankQuestion(Date.now())],
+    });
     setIdx((current) => Math.min(current, nextCount - 1));
   };
   const applyQuestionTemplate = (template: string) => {
@@ -1136,7 +1407,10 @@ function Builder({
           : template === "other"
             ? [blankQuestion(Date.now())]
             : buildDefaultQuestions();
-    setQ({ ...q, questions });
+    setQ({
+      ...q,
+      questions: questions.length ? questions : [blankQuestion(Date.now())],
+    });
     setIdx(0);
     setQuestionError("");
   };
@@ -1145,6 +1419,34 @@ function Builder({
     const nextQuestions = [...q.questions, blankQuestion(Date.now())];
     setQ({ ...q, questions: nextQuestions });
     setIdx(nextQuestions.length - 1);
+    setQuestionTemplate("other");
+    setQuestionError("");
+  };
+  const importQuestionBank = (bankId: string) => {
+    setSelectedBank(bankId);
+    const bank = questionBanks.find((item) => item.id === bankId);
+    if (!bank) return;
+    const selectedQuestions =
+      bank.questions.length <= 25
+        ? bank.questions
+        : [
+            ...bank.questions
+              .filter((item) => (item.type ?? "choice") === "choice")
+              .slice(0, 24),
+            ...bank.questions
+              .filter((item) => item.type === "essay")
+              .slice(0, 1),
+          ];
+    const questions = selectedQuestions.map((item, index) => ({
+      ...item,
+      id: Date.now() + index,
+      options: [...item.options],
+    }));
+    setQ({
+      ...q,
+      questions: questions.length ? questions : [blankQuestion(Date.now())],
+    });
+    setIdx(0);
     setQuestionTemplate("other");
     setQuestionError("");
   };
@@ -1271,19 +1573,36 @@ function Builder({
                 </div>
               </div>
               {!initial && (
-                <div>
-                  <label className="label">默认题型组合</label>
-                  <select
-                    className="input"
-                    value={questionTemplate}
-                    onChange={(e) => applyQuestionTemplate(e.target.value)}
-                  >
-                    <option value="mixed">10 道选择题 + 2 道策论题</option>
-                    <option value="choice">12 道选择题</option>
-                    <option value="essay">12 道策论题</option>
-                    <option value="other">其他（空白题库，逐题添加）</option>
-                  </select>
-                </div>
+                <>
+                  <div>
+                    <label className="label">从题库导入</label>
+                    <select
+                      className="input"
+                      value={selectedBank}
+                      onChange={(e) => importQuestionBank(e.target.value)}
+                    >
+                      <option value="">不使用题库</option>
+                      {questionBanks.map((bank) => (
+                        <option key={bank.id} value={bank.id}>
+                          {bank.title}（最多导入 25 题）
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">默认题型组合</label>
+                    <select
+                      className="input"
+                      value={questionTemplate}
+                      onChange={(e) => applyQuestionTemplate(e.target.value)}
+                    >
+                      <option value="mixed">10 道选择题 + 2 道策论题</option>
+                      <option value="choice">12 道选择题</option>
+                      <option value="essay">12 道策论题</option>
+                      <option value="other">其他（空白题库，逐题添加）</option>
+                    </select>
+                  </div>
+                </>
               )}
               <div>
                 <label className="label">题目总数</label>
@@ -1405,9 +1724,22 @@ function Builder({
                 ))}
               </div>
             ) : (
-              <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
-                学员将填写约 200
-                字的文字回答，并看到实时字数。提交后由管理员评为合格或不合格。
+              <div className="mt-4 space-y-4">
+                <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
+                  学员将填写文字回答并看到实时字数，提交后由管理员评为合格或不合格。
+                </div>
+                <div className="max-w-xs">
+                  <label className="label">最高字数</label>
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={question.wordLimit || 1000}
+                    onChange={(event) =>
+                      uq({ wordLimit: Math.max(1, +event.target.value) })
+                    }
+                  />
+                </div>
               </div>
             )}
             {(question.type ?? "choice") === "choice" && (
@@ -1550,15 +1882,6 @@ function LearnerDashboard({
   const completedCount = publishedQuizzes.filter((quiz) =>
     completedQuizIds.has(quiz.id),
   ).length;
-  const gradedLearnerAttempts = learnerAttempts.filter(
-    (attempt) => attempt.status !== "Pending",
-  );
-  const averageScore = gradedLearnerAttempts.length
-    ? Math.round(
-        gradedLearnerAttempts.reduce((sum, attempt) => sum + attempt.score, 0) /
-          gradedLearnerAttempts.length,
-      )
-    : 0;
   const completionRate = publishedQuizzes.length
     ? Math.round((completedCount / publishedQuizzes.length) * 100)
     : 0;
@@ -1675,8 +1998,8 @@ function LearnerDashboard({
             <p className="text-sm text-slate-500">已完成考核</p>
           </div>
           <div>
-            <p className="text-2xl font-bold">{averageScore}%</p>
-            <p className="text-sm text-slate-500">平均分</p>
+            <p className="text-2xl font-bold">{learnerAttempts.length}</p>
+            <p className="text-sm text-slate-500">提交次数</p>
           </div>
           <div>
             <p className="text-2xl font-bold">{completionRate}%</p>
@@ -1922,14 +2245,17 @@ function QuizTake({
             <div className="mt-8">
               <textarea
                 className="input min-h-64 resize-y text-base leading-7"
+                maxLength={q.wordLimit || 1000}
                 value={typeof answers[idx] === "string" ? answers[idx] : ""}
                 onChange={(e) =>
                   setAnswers({ ...answers, [idx]: e.target.value })
                 }
-                placeholder="请在这里填写约 200 字的回答……"
+                placeholder={`请在这里填写回答（最多 ${q.wordLimit || 1000} 字）……`}
               />
               <div className="mt-2 flex justify-between text-sm">
-                <span className="text-slate-500">建议回答约 200 字</span>
+                <span className="text-slate-500">
+                  最多 {q.wordLimit || 1000} 字
+                </span>
                 <span
                   className={`font-bold ${(typeof answers[idx] === "string" ? answers[idx].trim().length : 0) >= 180 ? "text-emerald-700" : "text-slate-500"}`}
                 >
@@ -2045,18 +2371,7 @@ function ResultDetail({
   useEffect(() => {
     setReviewTab(choiceQuestions.length ? "choice" : "essay");
   }, [attempt.id]);
-  const choiceCorrect = choiceQuestions.filter(
-    ({ question, index }) => attempt.answers[index] === question.correct,
-  ).length;
-  const choiceScore = choiceQuestions.length
-    ? Math.round((choiceCorrect / choiceQuestions.length) * 100)
-    : 0;
-  const choicePassed = choiceScore >= quiz.passingScore;
-  const visibleStatus = admin
-    ? attempt.status
-    : choicePassed
-      ? "Passed"
-      : "Failed";
+  const visibleStatus = admin ? attempt.status : "Pending";
   return (
     <>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -2096,23 +2411,21 @@ function ResultDetail({
               )}
             </div>
             <p className="mt-4 text-sm font-bold tracking-widest">
-              {admin
-                ? statusText(attempt.status)
-                : `选择题${choicePassed ? "合格" : "不合格"}`}
+              {admin ? statusText(attempt.status) : "已提交"}
             </p>
             <h1 className="mt-2 text-5xl font-bold">
               {admin
                 ? attempt.status === "Pending"
                   ? "—"
                   : `${attempt.score}%`
-                : `${choiceScore}%`}
+                : "等待管理端处理"}
             </h1>
             <p className="mt-2 text-slate-600">
               {admin
                 ? attempt.status === "Pending"
                   ? `策论题评分完成后生成最终成绩 · ${quiz.title}`
                   : `答对 ${attempt.correct} / ${attempt.total} 题 · ${quiz.title}`
-                : `选择题答对 ${choiceCorrect} / ${choiceQuestions.length} 题 · ${quiz.title}`}
+                : quiz.title}
             </p>
           </div>
           <div className="grid grid-cols-3 divide-x divide-slate-100 p-6 text-center">
@@ -2266,12 +2579,12 @@ function ResultDetail({
                     ) : (
                       <>
                         <p
-                          className={`mt-2 text-sm ${ok ? "text-emerald-700" : "text-rose-600"}`}
+                          className={`mt-2 text-sm ${admin ? (ok ? "text-emerald-700" : "text-rose-600") : "text-slate-700"}`}
                         >
                           学员答案：
                           {typeof a === "number" ? q.options[a] : "未记录"}
                         </p>
-                        {!ok && (
+                        {admin && !ok && (
                           <p className="mt-1 text-sm text-emerald-700">
                             正确答案：{q.options[q.correct]}
                           </p>
@@ -2312,6 +2625,7 @@ export default function App() {
   const [view, setView] = useState<View>("dashboard");
   const [resultBack, setResultBack] = useState<View>("results");
   const [quizzes, setQuizzes] = useState(seedQuizzes);
+  const [questionBanks, setQuestionBanks] = useState(seedQuestionBanks);
   const [attempts, setAttempts] = useState(seedAttempts);
   const [active, setActive] = useState<Quiz>();
   const [edit, setEdit] = useState<Quiz>();
@@ -2354,6 +2668,7 @@ export default function App() {
             resultsReleased: q.resultsReleased ?? false,
           })),
         );
+        setQuestionBanks(s.questionBanks || seedQuestionBanks);
         if (!attemptsLoadedFromBackend && !savedAttempts.length)
           savedAttempts = s.attempts || seedAttempts;
         setAttempts(
@@ -2402,6 +2717,7 @@ export default function App() {
         if (raw) {
           const s = JSON.parse(raw);
           setQuizzes(s.quizzes || seedQuizzes);
+          setQuestionBanks(s.questionBanks || seedQuestionBanks);
           setAttempts(s.attempts || seedAttempts);
           setLearnerRecords(s.learnerRecords || learners);
           setAnnouncement(s.announcement || "");
@@ -2418,6 +2734,7 @@ export default function App() {
     if (!hydrated.current) return;
     const state = {
       quizzes,
+      questionBanks,
       learnerRecords,
       announcement,
       announcementPersistent,
@@ -2428,6 +2745,7 @@ export default function App() {
     );
   }, [
     quizzes,
+    questionBanks,
     attempts,
     accounts,
     learnerRecords,
@@ -2439,12 +2757,14 @@ export default function App() {
     nextLearners: LearnerRecord[],
     nextAnnouncement: string,
     nextAnnouncementPersistent = announcementPersistent,
+    nextQuestionBanks = questionBanks,
   ) => {
     const response = await fetch("/api/state", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         quizzes: nextQuizzes,
+        questionBanks: nextQuestionBanks,
         learnerRecords: nextLearners,
         announcement: nextAnnouncement,
         announcementPersistent: nextAnnouncementPersistent,
@@ -2473,6 +2793,22 @@ export default function App() {
       .catch((error) => {
         setLearnerRecords(previous);
         alert(`${error.message}，本次部门修改已撤销。`);
+      });
+  };
+  const updateQuestionBanksAndSync = (next: QuestionBank[]) => {
+    const previous = questionBanks;
+    setQuestionBanks(next);
+    void saveSharedState(
+      quizzes,
+      learnerRecords,
+      announcement,
+      announcementPersistent,
+      next,
+    )
+      .then(showSaveSuccess)
+      .catch((error) => {
+        setQuestionBanks(previous);
+        alert(`${error.message}，本次题库修改已撤销。`);
       });
   };
   const shouldShowCurrentAnnouncement = () =>
@@ -2663,23 +2999,14 @@ export default function App() {
               return;
             }
           } catch {}
-          const choiceQuestions = active.questions
-            .map((question, index) => ({ question, index }))
-            .filter(({ question }) => (question.type ?? "choice") === "choice");
-          const choiceCorrect = choiceQuestions.filter(
-            ({ question, index }) => a.answers[index] === question.correct,
-          ).length;
-          const choiceScore = choiceQuestions.length
-            ? Math.round((choiceCorrect / choiceQuestions.length) * 100)
-            : 0;
           const learnerAttempt: Attempt = {
             ...a,
             questionSnapshot: active.questions,
             passingScoreSnapshot: active.passingScore,
-            correct: choiceCorrect,
-            total: choiceQuestions.length,
-            score: choiceScore,
-            status: choiceScore >= active.passingScore ? "Passed" : "Failed",
+            correct: 0,
+            total: 0,
+            score: 0,
+            status: "Pending",
           };
           setAttempts([learnerAttempt, ...attempts]);
           setSelected(learnerAttempt);
@@ -2694,6 +3021,7 @@ export default function App() {
     content = (
       <Builder
         initial={edit}
+        questionBanks={questionBanks}
         onCancel={() => setView("quizzes")}
         onSave={(q) => {
           updateQuizzesAndSync(
@@ -2703,6 +3031,13 @@ export default function App() {
           );
           setView("quizzes");
         }}
+      />
+    );
+  else if (role === "admin" && view === "banks")
+    content = (
+      <QuestionBankManagement
+        banks={questionBanks}
+        saveBanks={updateQuestionBanksAndSync}
       />
     );
   else if (view === "resultDetail" && selected) {
@@ -2781,10 +3116,10 @@ export default function App() {
     content = (
       <>
         <PageTitle
-          title={role === "learner" ? "我的成绩" : "考核结果"}
+          title={role === "learner" ? "我的提交记录" : "考核结果"}
           desc={
             role === "learner"
-              ? "查看你的考核记录和成绩。"
+              ? "查看你已经提交的考核记录。"
               : "查看成绩、完成情况和专注模式事件。"
           }
         />
@@ -2792,6 +3127,7 @@ export default function App() {
           <ResultTable
             attempts={rows}
             names={names}
+            hideScores={role === "learner"}
             onOpen={(a) => {
               setSelected(a);
               setResultBack("results");
