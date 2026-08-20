@@ -36,7 +36,10 @@ export type Attempt = {
   total: number;
   timeUsed: number;
   answers: Record<number, number | string>;
+  questionSnapshot?: Question[];
+  passingScoreSnapshot?: number;
   essayGrades?: Record<number, "Passed" | "Failed">;
+  essayComments?: Record<number, string>;
   status: "Passed" | "Failed" | "Pending";
   tabSwitches: number;
   fullscreenExits: number;

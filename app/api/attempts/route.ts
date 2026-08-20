@@ -55,7 +55,10 @@ export async function POST(request: Request) {
     attempt.correct = correct;
     attempt.total = quiz.questions.length;
     attempt.score = score;
+    attempt.questionSnapshot = quiz.questions;
+    attempt.passingScoreSnapshot = quiz.passingScore;
     attempt.essayGrades = {};
+    attempt.essayComments = {};
     attempt.status = hasEssay
       ? "Pending"
       : score >= quiz.passingScore
@@ -94,7 +97,12 @@ export async function PATCH(request: Request) {
     const session = await readSession();
     if (session?.role !== "admin")
       return NextResponse.json({ error: "仅管理员可以评分" }, { status: 403 });
-    const { attemptId, questionIndex, grade } = await request.json();
+    const {
+      attemptId,
+      questionIndex,
+      grade,
+      comment = "",
+    } = await request.json();
     if (
       !attemptId ||
       !Number.isInteger(questionIndex) ||
@@ -114,7 +122,8 @@ export async function PATCH(request: Request) {
     const quiz = availableQuizzes.find(
       (item: any) => item.id === attempt.quizId,
     );
-    const question = quiz?.questions?.[questionIndex];
+    const questions = attempt.questionSnapshot || quiz?.questions;
+    const question = questions?.[questionIndex];
     if (!question || question.type !== "essay")
       return NextResponse.json({ error: "该题不是策论题" }, { status: 400 });
 
@@ -122,12 +131,16 @@ export async function PATCH(request: Request) {
       ...(attempt.essayGrades || {}),
       [questionIndex]: grade,
     };
-    const choiceCorrect = quiz.questions.filter(
+    attempt.essayComments = {
+      ...(attempt.essayComments || {}),
+      [questionIndex]: String(comment).trim(),
+    };
+    const choiceCorrect = questions.filter(
       (item: any, index: number) =>
         (item.type || "choice") === "choice" &&
         attempt.answers?.[index] === item.correct,
     ).length;
-    const essayIndexes = quiz.questions
+    const essayIndexes = questions
       .map((item: any, index: number) => (item.type === "essay" ? index : -1))
       .filter((index: number) => index >= 0);
     const essayPassed = essayIndexes.filter(
@@ -137,10 +150,10 @@ export async function PATCH(request: Request) {
       (index: number) => attempt.essayGrades[index],
     );
     attempt.correct = choiceCorrect + essayPassed;
-    attempt.total = quiz.questions.length;
+    attempt.total = questions.length;
     attempt.score = Math.round((attempt.correct / attempt.total) * 100);
     attempt.status = allGraded
-      ? attempt.score >= quiz.passingScore
+      ? attempt.score >= (attempt.passingScoreSnapshot ?? quiz.passingScore)
         ? "Passed"
         : "Failed"
       : "Pending";

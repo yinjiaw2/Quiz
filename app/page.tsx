@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Download,
   Edit3,
   Eye,
   Flag,
@@ -1945,14 +1946,22 @@ function ResultDetail({
   onGrade?: (
     questionIndex: number,
     grade: "Passed" | "Failed",
+    comment: string,
   ) => Promise<void>;
 }) {
+  const [essayComments, setEssayComments] = useState<Record<number, string>>(
+    attempt.essayComments || {},
+  );
+  useEffect(() => {
+    setEssayComments(attempt.essayComments || {});
+  }, [attempt.id, attempt.essayComments]);
   const canReview =
     admin ||
     quiz.resultsReleased ||
     quiz.answerRelease === "immediate" ||
     (quiz.answerRelease === "deadline" &&
       new Date().getTime() >= new Date(quiz.deadline).getTime());
+  const reviewQuestions = attempt.questionSnapshot || quiz.questions;
   return (
     <>
       <button
@@ -2016,7 +2025,7 @@ function ResultDetail({
               </p>
             )}
             <div className="mt-5 space-y-5">
-              {quiz.questions.map((q, i) => {
+              {reviewQuestions.map((q, i) => {
                 const a = attempt.answers[i];
                 const ok = a === q.correct;
                 return (
@@ -2033,6 +2042,30 @@ function ResultDetail({
                           回答字数：
                           {typeof a === "string" ? a.trim().length : 0}
                         </p>
+                        {admin && onGrade ? (
+                          <div className="mt-4">
+                            <label className="label">批改意见</label>
+                            <textarea
+                              className="input min-h-24"
+                              value={essayComments[i] || ""}
+                              onChange={(event) =>
+                                setEssayComments({
+                                  ...essayComments,
+                                  [i]: event.target.value,
+                                })
+                              }
+                              placeholder="请输入对这道策论题的批改意见（可选）"
+                            />
+                            <p className="mt-1 text-xs text-slate-500">
+                              点击下面的评分按钮时，评分和批改意见会一起保存到后端。
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="mt-3 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">
+                            <span className="font-bold">批改意见：</span>
+                            {attempt.essayComments?.[i] || "暂无批改意见"}
+                          </div>
+                        )}
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <span className="text-sm font-semibold text-slate-600">
                             管理员评分：
@@ -2041,13 +2074,25 @@ function ResultDetail({
                             <>
                               <button
                                 className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Passed" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
-                                onClick={() => void onGrade(i, "Passed")}
+                                onClick={() =>
+                                  void onGrade(
+                                    i,
+                                    "Passed",
+                                    essayComments[i] || "",
+                                  )
+                                }
                               >
                                 合格
                               </button>
                               <button
                                 className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Failed" ? "bg-rose-600 text-white" : "bg-rose-50 text-rose-700 hover:bg-rose-100"}`}
-                                onClick={() => void onGrade(i, "Failed")}
+                                onClick={() =>
+                                  void onGrade(
+                                    i,
+                                    "Failed",
+                                    essayComments[i] || "",
+                                  )
+                                }
                               >
                                 不合格
                               </button>
@@ -2357,6 +2402,7 @@ export default function App() {
   const gradeEssay = async (
     questionIndex: number,
     grade: "Passed" | "Failed",
+    comment: string,
   ) => {
     if (!selected) return;
     try {
@@ -2367,6 +2413,7 @@ export default function App() {
           attemptId: selected.id,
           questionIndex,
           grade,
+          comment,
         }),
       });
       const body = await response.json();
@@ -2543,6 +2590,14 @@ export default function App() {
             role === "learner"
               ? "查看你的考核记录和成绩。"
               : "查看成绩、完成情况和专注模式事件。"
+          }
+          action={
+            role === "admin" ? (
+              <a className="btn-primary" href="/api/admin/export">
+                <Download size={17} />
+                导出全部答题记录
+              </a>
+            ) : undefined
           }
         />
         <div className="card overflow-hidden">
