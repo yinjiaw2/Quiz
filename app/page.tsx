@@ -711,8 +711,9 @@ function LearnerManagement({
             <tbody className="divide-y divide-slate-100">
               {records.map((l) => {
                 const rows = attemptsFor(l, attempts);
-                const passed =
-                  rows.length > 0 && rows.some((a) => a.status === "Passed");
+                const waiting =
+                  rows.length === 0 || rows.some((a) => a.status === "Pending");
+                const passed = rows.some((a) => a.status === "Passed");
                 return (
                   <tr
                     key={l.email}
@@ -746,9 +747,9 @@ function LearnerManagement({
                     </td>
                     <td className="px-5">
                       <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-bold ${passed ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}
+                        className={`rounded-full px-2.5 py-1 text-xs font-bold ${waiting ? "bg-amber-50 text-amber-700" : passed ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}
                       >
-                        {passed ? "合格" : "不合格"}
+                        {waiting ? "等待结果" : passed ? "合格" : "不合格"}
                       </span>
                     </td>
                     <td className="px-5 font-semibold">{rows.length}</td>
