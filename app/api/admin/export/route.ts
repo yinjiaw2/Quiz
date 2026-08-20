@@ -11,17 +11,19 @@ const csvCell = (value: unknown) => {
   return `"${text.replaceAll('"', '""')}"`;
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   const session = await readSession();
   if (session?.role !== "admin")
     return Response.json({ error: "仅管理员可以导出" }, { status: 403 });
 
   try {
     const sql = await ensureSchema();
-    const [attemptRows, stateRows] = await Promise.all([
-      sql`SELECT data FROM redbridge_attempts ORDER BY created_at DESC`,
-      sql`SELECT data FROM redbridge_state WHERE id = 'main'`,
-    ]);
+    const quizId = new URL(request.url).searchParams.get("quizId");
+    const stateRows =
+      await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
+    const attemptRows = quizId
+      ? await sql`SELECT data FROM redbridge_attempts WHERE quiz_id = ${quizId} ORDER BY created_at DESC`
+      : await sql`SELECT data FROM redbridge_attempts ORDER BY created_at DESC`;
     const quizzes = stateRows[0]?.data?.quizzes || seedQuizzes;
     const quizMap = new Map(quizzes.map((quiz: any) => [quiz.id, quiz]));
     const header = [
@@ -44,11 +46,11 @@ export async function GET() {
     for (const row of attemptRows) {
       const attempt = row.data;
       const quiz: any = quizMap.get(attempt.quizId);
-      if (!quiz) {
+      if (!quiz && !attempt.questionSnapshot) {
         rows.push([
           attempt.id,
           attempt.learner,
-          "已归档考核",
+          "原考核已删除（记录保留）",
           attempt.date,
           attempt.status,
           attempt.status === "Pending" ? "待评分" : attempt.score,
@@ -63,6 +65,7 @@ export async function GET() {
         continue;
       }
       const questions = attempt.questionSnapshot || quiz.questions;
+      const quizTitle = quiz?.title || "原考核已删除（记录保留）";
       questions.forEach((question: any, index: number) => {
         const type = question.type || "choice";
         const answer = attempt.answers?.[index];
@@ -77,7 +80,7 @@ export async function GET() {
         rows.push([
           attempt.id,
           attempt.learner,
-          quiz.title,
+          quizTitle,
           attempt.date,
           attempt.status === "Pending"
             ? "待管理员评分"
@@ -108,8 +111,7 @@ export async function GET() {
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition":
-          'attachment; filename="redbridge-answer-records.csv"',
+        "Content-Disposition": `attachment; filename="${quizId ? "redbridge-quiz-results" : "redbridge-all-results"}.csv"`,
         "Cache-Control": "no-store",
       },
     });

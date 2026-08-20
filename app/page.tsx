@@ -622,7 +622,7 @@ function ResultTable({
             >
               <td className="px-5 py-4 font-semibold">{a.learner}</td>
               <td className="px-5 py-4 text-slate-600">
-                {names[a.quizId] || "已归档考核"}
+                {names[a.quizId] || "原考核已删除（记录保留）"}
               </td>
               <td className="px-5 py-4 font-bold">
                 {a.status === "Pending" ? "待评分" : `${a.score}%`}
@@ -909,10 +909,16 @@ function AdminQuizzes({
         title="考核管理"
         desc="创建、发布和管理实习生考核。"
         action={
-          <button className="btn-primary" onClick={() => edit()}>
-            <Plus size={17} />
-            创建考核
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <a className="btn-secondary" href="/api/admin/export">
+              <Download size={17} />
+              考核结果全部导出
+            </a>
+            <button className="btn-primary" onClick={() => edit()}>
+              <Plus size={17} />
+              创建考核
+            </button>
+          </div>
         }
       />
       <div className="card overflow-hidden">
@@ -963,6 +969,14 @@ function AdminQuizzes({
                   </td>
                   <td className="px-5">
                     <div className="flex gap-1">
+                      <a
+                        aria-label={`导出“${q.title}”的考核结果`}
+                        data-tooltip="单独导出此考核结果"
+                        className="icon-action"
+                        href={`/api/admin/export?quizId=${encodeURIComponent(q.id)}`}
+                      >
+                        <Download size={16} />
+                      </a>
                       <button
                         aria-label="编辑考核"
                         data-tooltip="编辑考核"
@@ -2166,9 +2180,6 @@ function ResultDetail({
                             正确答案：{q.options[q.correct]}
                           </p>
                         )}
-                        <p className="mt-2 text-xs text-slate-500">
-                          {q.explanation}
-                        </p>
                       </>
                     )}
                   </div>
@@ -2663,7 +2674,7 @@ export default function App() {
             role === "admin" ? (
               <a className="btn-primary" href="/api/admin/export">
                 <Download size={17} />
-                导出全部答题记录
+                考核结果全部导出
               </a>
             ) : undefined
           }
