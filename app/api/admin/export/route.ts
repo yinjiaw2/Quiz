@@ -18,12 +18,16 @@ export async function GET(request: Request) {
 
   try {
     const sql = await ensureSchema();
-    const quizId = new URL(request.url).searchParams.get("quizId");
+    const params = new URL(request.url).searchParams;
+    const quizId = params.get("quizId");
+    const learner = params.get("learner");
     const stateRows =
       await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
-    const attemptRows = quizId
-      ? await sql`SELECT data FROM redbridge_attempts WHERE quiz_id = ${quizId} ORDER BY created_at DESC`
-      : await sql`SELECT data FROM redbridge_attempts ORDER BY created_at DESC`;
+    const attemptRows = learner
+      ? await sql`SELECT data FROM redbridge_attempts WHERE learner = ${learner} ORDER BY created_at DESC`
+      : quizId
+        ? await sql`SELECT data FROM redbridge_attempts WHERE quiz_id = ${quizId} ORDER BY created_at DESC`
+        : await sql`SELECT data FROM redbridge_attempts ORDER BY created_at DESC`;
     const quizzes = stateRows[0]?.data?.quizzes || seedQuizzes;
     const quizMap = new Map(quizzes.map((quiz: any) => [quiz.id, quiz]));
     const header = [
@@ -111,7 +115,7 @@ export async function GET(request: Request) {
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${quizId ? "redbridge-quiz-results" : "redbridge-all-results"}.csv"`,
+        "Content-Disposition": `attachment; filename="${learner ? "redbridge-learner-results" : quizId ? "redbridge-quiz-results" : "redbridge-all-results"}.csv"`,
         "Cache-Control": "no-store",
       },
     });

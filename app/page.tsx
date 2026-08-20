@@ -748,6 +748,15 @@ function LearnerManagement({
                     <td className="px-5 font-semibold">{rows.length}</td>
                     <td className="px-5">
                       <div className="flex items-center gap-3">
+                        <a
+                          aria-label={`导出${l.name}的全部作答情况`}
+                          data-tooltip="导出该学员的全部作答情况"
+                          className="icon-action"
+                          href={`/api/admin/export?learner=${encodeURIComponent(l.name)}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <Download size={16} />
+                        </a>
                         <button
                           aria-label="查看考试记录"
                           data-tooltip="查看考试记录"
@@ -820,6 +829,15 @@ function LearnerDetail({
       <PageTitle
         title={learner.name}
         desc={`${learner.department} · ${learner.email}`}
+        action={
+          <a
+            className="btn-primary"
+            href={`/api/admin/export?learner=${encodeURIComponent(learner.name)}`}
+          >
+            <Download size={17} />
+            导出该学员全部作答
+          </a>
+        }
       />
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Stat
