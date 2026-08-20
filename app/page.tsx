@@ -933,16 +933,10 @@ function AdminQuizzes({
         title="考核管理"
         desc="创建、发布和管理实习生考核。"
         action={
-          <div className="flex flex-wrap gap-2">
-            <a className="btn-secondary" href="/api/admin/export">
-              <Download size={17} />
-              考核结果全部导出
-            </a>
-            <button className="btn-primary" onClick={() => edit()}>
-              <Plus size={17} />
-              创建考核
-            </button>
-          </div>
+          <button className="btn-primary" onClick={() => edit()}>
+            <Plus size={17} />
+            创建考核
+          </button>
         }
       />
       <div className="card overflow-hidden">
@@ -2750,14 +2744,6 @@ export default function App() {
             role === "learner"
               ? "查看你的考核记录和成绩。"
               : "查看成绩、完成情况和专注模式事件。"
-          }
-          action={
-            role === "admin" ? (
-              <a className="btn-primary" href="/api/admin/export">
-                <Download size={17} />
-                考核结果全部导出
-              </a>
-            ) : undefined
           }
         />
         <div className="card overflow-hidden">

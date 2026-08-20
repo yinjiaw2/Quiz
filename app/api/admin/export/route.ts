@@ -21,13 +21,16 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const quizId = params.get("quizId");
     const learner = params.get("learner");
+    if (!quizId && !learner)
+      return Response.json(
+        { error: "请选择一个考核或学员后再导出" },
+        { status: 400 },
+      );
     const stateRows =
       await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
     const attemptRows = learner
       ? await sql`SELECT data FROM redbridge_attempts WHERE learner = ${learner} ORDER BY created_at DESC`
-      : quizId
-        ? await sql`SELECT data FROM redbridge_attempts WHERE quiz_id = ${quizId} ORDER BY created_at DESC`
-        : await sql`SELECT data FROM redbridge_attempts ORDER BY created_at DESC`;
+      : await sql`SELECT data FROM redbridge_attempts WHERE quiz_id = ${quizId} ORDER BY created_at DESC`;
     const quizzes = stateRows[0]?.data?.quizzes || seedQuizzes;
     const quizMap = new Map(quizzes.map((quiz: any) => [quiz.id, quiz]));
     const header = [
@@ -111,11 +114,50 @@ export async function GET(request: Request) {
       });
     }
 
-    const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
+    let exportRows: unknown[][];
+    if (learner) {
+      const sortedRows = rows.slice(1).sort((left, right) => {
+        const byQuiz = String(left[2]).localeCompare(String(right[2]), "zh-CN");
+        return byQuiz || String(left[3]).localeCompare(String(right[3]));
+      });
+      const attemptNumbers = new Map<string, number>();
+      let nextAttemptNumber = 1;
+      exportRows = [
+        [
+          "测试编号",
+          "测试名称",
+          "最终状态",
+          "最终分数",
+          "题号",
+          "题型",
+          "题目",
+          "学员答案",
+          "正确答案",
+          "管理员评分",
+          "批改意见",
+        ],
+        ...sortedRows.map((row) => {
+          const attemptId = String(row[0]);
+          if (!attemptNumbers.has(attemptId))
+            attemptNumbers.set(attemptId, nextAttemptNumber++);
+          return [attemptNumbers.get(attemptId), row[2], ...row.slice(4)];
+        }),
+      ];
+    } else {
+      exportRows = [
+        header.slice(1),
+        ...rows.slice(1).map((row) => row.slice(1)),
+      ];
+    }
+
+    const csv = `\uFEFF${exportRows.map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
+    const contentDisposition = learner
+      ? `attachment; filename="learner-results.csv"; filename*=UTF-8''${encodeURIComponent(learner)}.csv`
+      : 'attachment; filename="redbridge-quiz-results.csv"';
     return new Response(csv, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${learner ? "redbridge-learner-results" : quizId ? "redbridge-quiz-results" : "redbridge-all-results"}.csv"`,
+        "Content-Disposition": contentDisposition,
         "Cache-Control": "no-store",
       },
     });
