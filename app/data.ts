@@ -82,6 +82,7 @@ export const buildEssayQuestions = (count = 2, startId = 11) =>
     options: [],
     correct: 0,
     explanation: "",
+    wordLimit: 1000,
   }));
 
 export const buildDefaultQuestions = () => [

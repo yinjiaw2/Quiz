@@ -78,6 +78,29 @@ export async function POST(request: Request) {
       );
     const limit = Math.max(1, Number(quiz.maxAttempts) || 1);
     const answers = attempt.answers || {};
+    const oversizedEssayIndex = quiz.questions.findIndex(
+      (question: any, index: number) => {
+        if (question.type !== "essay") return false;
+        const wordLimit = Math.min(
+          1000,
+          Math.max(1, Number(question.wordLimit) || 1000),
+        );
+        return String(answers[index] || "").length > wordLimit;
+      },
+    );
+    if (oversizedEssayIndex >= 0) {
+      const wordLimit = Math.min(
+        1000,
+        Math.max(
+          1,
+          Number(quiz.questions[oversizedEssayIndex].wordLimit) || 1000,
+        ),
+      );
+      return NextResponse.json(
+        { error: `第 ${oversizedEssayIndex + 1} 题超过 ${wordLimit} 字上限` },
+        { status: 400 },
+      );
+    }
     const correct = quiz.questions.filter(
       (question: any, index: number) =>
         (question.type || "choice") === "choice" &&

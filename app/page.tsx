@@ -1308,10 +1308,14 @@ function QuestionBankManagement({
                       className="input"
                       type="number"
                       min="1"
+                      max="1000"
                       value={question.wordLimit || 1000}
                       onChange={(event) =>
                         updateQuestion(index, {
-                          wordLimit: Math.max(1, +event.target.value),
+                          wordLimit: Math.min(
+                            1000,
+                            Math.max(1, +event.target.value),
+                          ),
                         })
                       }
                     />
@@ -1373,6 +1377,9 @@ function Builder({
   const [idx, setIdx] = useState(0);
   const [questionTemplate, setQuestionTemplate] = useState("mixed");
   const [selectedBank, setSelectedBank] = useState("");
+  const [selectedBankQuestions, setSelectedBankQuestions] = useState<number[]>(
+    [],
+  );
   const [titleError, setTitleError] = useState("");
   const [questionError, setQuestionError] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
@@ -1422,26 +1429,38 @@ function Builder({
     setQuestionTemplate("other");
     setQuestionError("");
   };
-  const importQuestionBank = (bankId: string) => {
+  const selectQuestionBank = (bankId: string) => {
     setSelectedBank(bankId);
-    const bank = questionBanks.find((item) => item.id === bankId);
-    if (!bank) return;
-    const selectedQuestions =
-      bank.questions.length <= 25
-        ? bank.questions
-        : [
-            ...bank.questions
-              .filter((item) => (item.type ?? "choice") === "choice")
-              .slice(0, 24),
-            ...bank.questions
-              .filter((item) => item.type === "essay")
-              .slice(0, 1),
-          ];
-    const questions = selectedQuestions.map((item, index) => ({
-      ...item,
-      id: Date.now() + index,
-      options: [...item.options],
-    }));
+    setSelectedBankQuestions([]);
+  };
+  const selectedQuestionBank = questionBanks.find(
+    (item) => item.id === selectedBank,
+  );
+  const toggleBankQuestion = (questionIndex: number) => {
+    setSelectedBankQuestions((current) =>
+      current.includes(questionIndex)
+        ? current.filter((item) => item !== questionIndex)
+        : current.length < 25
+          ? [...current, questionIndex]
+          : current,
+    );
+  };
+  const importSelectedQuestions = () => {
+    if (!selectedQuestionBank || !selectedBankQuestions.length) return;
+    const questions = [...selectedBankQuestions]
+      .sort((a, b) => a - b)
+      .map((questionIndex) => selectedQuestionBank.questions[questionIndex])
+      .filter(Boolean)
+      .slice(0, 25)
+      .map((item, index) => ({
+        ...item,
+        id: Date.now() + index,
+        options: [...item.options],
+        wordLimit:
+          item.type === "essay"
+            ? Math.min(1000, Math.max(1, item.wordLimit || 1000))
+            : item.wordLimit,
+      }));
     setQ({
       ...q,
       questions: questions.length ? questions : [blankQuestion(Date.now())],
@@ -1579,7 +1598,7 @@ function Builder({
                     <select
                       className="input"
                       value={selectedBank}
-                      onChange={(e) => importQuestionBank(e.target.value)}
+                      onChange={(e) => selectQuestionBank(e.target.value)}
                     >
                       <option value="">不使用题库</option>
                       {questionBanks.map((bank) => (
@@ -1602,6 +1621,87 @@ function Builder({
                       <option value="other">其他（空白题库，逐题添加）</option>
                     </select>
                   </div>
+                  {selectedQuestionBank && (
+                    <div className="sm:col-span-2 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      <div className="grid lg:grid-cols-[minmax(0,1fr)_250px]">
+                        <div className="border-b border-slate-200 lg:border-b-0 lg:border-r">
+                          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+                            <div>
+                              <p className="font-bold text-slate-900">
+                                选择题目
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                从左侧勾选需要导入的考题，最多 25 道
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              className="text-sm font-bold text-red-700 hover:text-red-800"
+                              onClick={() => setSelectedBankQuestions([])}
+                            >
+                              清空选择
+                            </button>
+                          </div>
+                          <div className="max-h-80 overflow-y-auto p-2">
+                            {selectedQuestionBank.questions.map(
+                              (bankQuestion, bankQuestionIndex) => {
+                                const checked =
+                                  selectedBankQuestions.includes(
+                                    bankQuestionIndex,
+                                  );
+                                return (
+                                  <label
+                                    key={`${bankQuestion.id}-${bankQuestionIndex}`}
+                                    className="flex cursor-pointer items-start gap-3 rounded-xl px-3 py-3 hover:bg-slate-50"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="mt-1 h-4 w-4 accent-red-700"
+                                      checked={checked}
+                                      disabled={
+                                        !checked &&
+                                        selectedBankQuestions.length >= 25
+                                      }
+                                      onChange={() =>
+                                        toggleBankQuestion(bankQuestionIndex)
+                                      }
+                                    />
+                                    <span className="min-w-0 flex-1 text-sm text-slate-700">
+                                      {bankQuestionIndex + 1}.{" "}
+                                      {bankQuestion.text}
+                                    </span>
+                                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
+                                      {bankQuestion.type === "essay"
+                                        ? "策论题"
+                                        : "选择题"}
+                                    </span>
+                                  </label>
+                                );
+                              },
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col justify-between gap-5 bg-slate-50 p-5">
+                          <div>
+                            <p className="text-sm font-bold text-slate-900">
+                              已选择 {selectedBankQuestions.length} / 25 题
+                            </p>
+                            <p className="mt-2 text-xs leading-5 text-slate-500">
+                              导入后将替换当前 Quiz 中的题目，之后仍可继续编辑。
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={!selectedBankQuestions.length}
+                            onClick={importSelectedQuestions}
+                          >
+                            导入已选题目
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
               <div>
@@ -1734,9 +1834,15 @@ function Builder({
                     className="input"
                     type="number"
                     min="1"
+                    max="1000"
                     value={question.wordLimit || 1000}
                     onChange={(event) =>
-                      uq({ wordLimit: Math.max(1, +event.target.value) })
+                      uq({
+                        wordLimit: Math.min(
+                          1000,
+                          Math.max(1, +event.target.value),
+                        ),
+                      })
                     }
                   />
                 </div>
