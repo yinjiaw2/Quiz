@@ -6,6 +6,9 @@ import { learners, seedQuizzes } from "../../data";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const retiredDemoQuizIds = new Set(["product-03", "privacy-101", "conduct"]);
+const currentDemoQuizIds = new Set(seedQuizzes.map((quiz) => quiz.id));
+
 export async function GET() {
   try {
     const sql = await ensureSchema();
@@ -27,6 +30,20 @@ export async function GET() {
     const users =
       await sql`SELECT username, name FROM redbridge_users ORDER BY created_at`;
     const data = rows[0].data;
+    const storedQuizzes = data.quizzes || [];
+    const shouldReplaceRetiredDemos = storedQuizzes.some((quiz: any) =>
+      retiredDemoQuizIds.has(quiz.id),
+    );
+    if (shouldReplaceRetiredDemos) {
+      data.quizzes = [
+        ...seedQuizzes,
+        ...storedQuizzes.filter(
+          (quiz: any) =>
+            !retiredDemoQuizIds.has(quiz.id) &&
+            !currentDemoQuizIds.has(quiz.id),
+        ),
+      ];
+    }
     const demoEmails = new Set(learners.map((learner) => learner.email));
     const originalLearners = data.learnerRecords || [];
     const existing = originalLearners.filter(
@@ -46,7 +63,10 @@ export async function GET() {
           completed: 0,
         })),
     ];
-    if (existing.length !== originalLearners.length) {
+    if (
+      shouldReplaceRetiredDemos ||
+      existing.length !== originalLearners.length
+    ) {
       data.learnerRecords = learnerRecords;
       await sql`
         UPDATE redbridge_state

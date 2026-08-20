@@ -53,11 +53,12 @@ const topics: Array<[string, string[], number, string]> = [
   ],
 ];
 
-export const buildQuestions = () =>
-  Array.from({ length: 25 }, (_, i) => {
+export const buildQuestions = (count = 10, startId = 1) =>
+  Array.from({ length: count }, (_, i) => {
     const t = topics[i % topics.length];
     return {
-      id: i + 1,
+      id: startId + i,
+      type: "choice" as const,
       text: `${t[0]}${i >= topics.length ? `（情景 ${i + 1}）` : ""}`,
       options: [...t[1]] as string[],
       correct: t[2] as number,
@@ -65,27 +66,52 @@ export const buildQuestions = () =>
     };
   });
 
+const essayTopics = [
+  "如果客户对服务结果不满意，你会如何了解问题并提出解决方案？",
+  "请结合实际工作，说明你将如何在效率与客户信息安全之间取得平衡。",
+  "当团队成员对工作优先级意见不一致时，你会如何推动问题解决？",
+  "请说明一次高质量客户沟通应当包含哪些关键步骤。",
+  "如果你发现现有工作流程存在风险，你会如何记录、汇报并推动改善？",
+];
+
+export const buildEssayQuestions = (count = 2, startId = 11) =>
+  Array.from({ length: count }, (_, i) => ({
+    id: startId + i,
+    type: "essay" as const,
+    text: essayTopics[i % essayTopics.length],
+    options: [],
+    correct: 0,
+    explanation: "",
+  }));
+
+export const buildDefaultQuestions = () => [
+  ...buildQuestions(10, 1),
+  ...buildEssayQuestions(2, 11),
+];
+
 const demoAnswers = (wrongQuestions: number[]) =>
   Object.fromEntries(
-    buildQuestions().map((question, index) => [
+    buildDefaultQuestions().map((question, index) => [
       index,
-      wrongQuestions.includes(index)
-        ? (question.correct + 1) % question.options.length
-        : question.correct,
+      question.type === "essay"
+        ? "我会先了解事实和客户的核心诉求，确认影响范围，再根据公司流程提出清晰、可执行的解决方案。同时记录沟通过程，及时向相关负责人汇报，并在问题解决后跟进客户反馈，确保同类问题得到持续改善。"
+        : wrongQuestions.includes(index)
+          ? (question.correct + 1) % question.options.length
+          : question.correct,
     ]),
   );
 
 export const seedQuizzes: Quiz[] = [
   {
-    id: "product-03",
-    title: "产品知识考核 03",
-    description: "检验学员对产品、安全与客户体验基础知识的掌握情况。",
-    deadline: "2026-08-16T17:00",
-    passingScore: 80,
+    id: "sales-foundation-mixed",
+    title: "销售基础综合考核",
+    description: "包含 10 道选择题和 2 道策论题，考核销售基础与客户沟通能力。",
+    deadline: "2026-09-15T17:00",
+    passingScore: 75,
     timeLimit: 30,
     maxAttempts: 2,
     status: "Published",
-    questions: buildQuestions(),
+    questions: buildDefaultQuestions(),
     showScore: true,
     answerRelease: "deadline",
     resultsReleased: false,
@@ -96,15 +122,15 @@ export const seedQuizzes: Quiz[] = [
     autoSubmit: true,
   },
   {
-    id: "privacy-101",
-    title: "隐私与数据处理",
-    description: "复习如何安全处理员工和客户信息。",
-    deadline: "2026-08-25T17:00",
-    passingScore: 80,
+    id: "operations-scenario-mixed",
+    title: "运营情景综合考核",
+    description: "包含 10 道选择题和 2 道策论题，考核运营流程与问题处理能力。",
+    deadline: "2026-09-22T17:00",
+    passingScore: 75,
     timeLimit: 25,
     maxAttempts: 2,
     status: "Published",
-    questions: buildQuestions(),
+    questions: buildDefaultQuestions(),
     showScore: true,
     answerRelease: "immediate",
     resultsReleased: true,
@@ -115,15 +141,16 @@ export const seedQuizzes: Quiz[] = [
     autoSubmit: true,
   },
   {
-    id: "conduct",
-    title: "职场行为规范",
-    description: "针对最新职场行为政策的简短考核。",
-    deadline: "2026-09-02T17:00",
+    id: "workplace-readiness-mixed",
+    title: "职场胜任力综合考核",
+    description:
+      "包含 10 道选择题和 2 道策论题，考核职场规范、协作与风险意识。",
+    deadline: "2026-09-29T17:00",
     passingScore: 75,
     timeLimit: 30,
     maxAttempts: 1,
     status: "Draft",
-    questions: buildQuestions(),
+    questions: buildDefaultQuestions(),
     showScore: true,
     answerRelease: "deadline",
     resultsReleased: false,
@@ -138,42 +165,45 @@ export const seedQuizzes: Quiz[] = [
 export const seedAttempts: Attempt[] = [
   {
     id: "a1",
-    quizId: "privacy-101",
+    quizId: "sales-foundation-mixed",
     learner: "Eric Zhang",
     date: "2026-08-06T10:22:00",
     score: 92,
-    correct: 23,
-    total: 25,
+    correct: 11,
+    total: 12,
     timeUsed: 18,
     answers: demoAnswers([3, 17]),
+    essayGrades: { 10: "Passed", 11: "Passed" },
     status: "Passed",
     tabSwitches: 1,
     fullscreenExits: 0,
   },
   {
     id: "a2",
-    quizId: "product-03",
+    quizId: "operations-scenario-mixed",
     learner: "Mia Chen",
     date: "2026-08-10T14:06:00",
-    score: 88,
-    correct: 22,
-    total: 25,
+    score: 83,
+    correct: 10,
+    total: 12,
     timeUsed: 21,
     answers: demoAnswers([1, 8, 20]),
+    essayGrades: { 10: "Passed", 11: "Passed" },
     status: "Passed",
     tabSwitches: 2,
     fullscreenExits: 1,
   },
   {
     id: "a3",
-    quizId: "privacy-101",
+    quizId: "workplace-readiness-mixed",
     learner: "James Wilson",
     date: "2026-08-11T09:18:00",
-    score: 68,
-    correct: 17,
-    total: 25,
+    score: 58,
+    correct: 7,
+    total: 12,
     timeUsed: 24,
-    answers: demoAnswers([0, 1, 2, 3, 4, 5, 6, 7]),
+    answers: demoAnswers([0, 1, 2, 3]),
+    essayGrades: { 10: "Passed", 11: "Failed" },
     status: "Failed",
     tabSwitches: 0,
     fullscreenExits: 0,

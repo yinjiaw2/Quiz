@@ -30,7 +30,14 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { buildQuestions, learners, seedAttempts, seedQuizzes } from "./data";
+import {
+  buildDefaultQuestions,
+  buildEssayQuestions,
+  buildQuestions,
+  learners,
+  seedAttempts,
+  seedQuizzes,
+} from "./data";
 import { Attempt, Quiz, Role } from "./types";
 
 type View =
@@ -1045,7 +1052,7 @@ function Builder({
       timeLimit: 30,
       maxAttempts: 1,
       status: "Draft",
-      questions: buildQuestions(),
+      questions: buildDefaultQuestions(),
       showScore: true,
       answerRelease: "deadline",
       resultsReleased: false,
@@ -1057,6 +1064,7 @@ function Builder({
     },
   );
   const [idx, setIdx] = useState(0);
+  const [questionTemplate, setQuestionTemplate] = useState("mixed");
   const [titleError, setTitleError] = useState("");
   const [questionError, setQuestionError] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
@@ -1077,6 +1085,18 @@ function Builder({
     );
     setQ({ ...q, questions });
     setIdx((current) => Math.min(current, nextCount - 1));
+  };
+  const applyQuestionTemplate = (template: string) => {
+    setQuestionTemplate(template);
+    const questions =
+      template === "choice"
+        ? buildQuestions(12, 1)
+        : template === "essay"
+          ? buildEssayQuestions(12, 1)
+          : buildDefaultQuestions();
+    setQ({ ...q, questions });
+    setIdx(0);
+    setQuestionError("");
   };
   const validateAndSave = () => {
     setTitleError("");
@@ -1200,6 +1220,20 @@ function Builder({
                   </span>
                 </div>
               </div>
+              {!initial && (
+                <div>
+                  <label className="label">默认题型组合</label>
+                  <select
+                    className="input"
+                    value={questionTemplate}
+                    onChange={(e) => applyQuestionTemplate(e.target.value)}
+                  >
+                    <option value="mixed">10 道选择题 + 2 道策论题</option>
+                    <option value="choice">12 道选择题</option>
+                    <option value="essay">12 道策论题</option>
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="label">题目总数</label>
                 <input
