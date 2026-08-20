@@ -78,7 +78,43 @@ export async function POST(request: Request) {
       );
     const limit = Math.max(1, Number(quiz.maxAttempts) || 1);
     const answers = attempt.answers || {};
-    const oversizedEssayIndex = quiz.questions.findIndex(
+    const canonicalOrder = quiz.questions.map((_: any, index: number) => index);
+    const requestedOrder = Array.isArray(attempt.questionOrder)
+      ? attempt.questionOrder.map(Number)
+      : [];
+    const validQuestionOrder =
+      requestedOrder.length === canonicalOrder.length &&
+      new Set(requestedOrder).size === canonicalOrder.length &&
+      requestedOrder.every(
+        (index: number) => index >= 0 && index < canonicalOrder.length,
+      );
+    const questionOrder = validQuestionOrder ? requestedOrder : canonicalOrder;
+    const questionSnapshot = questionOrder.map(
+      (originalQuestionIndex: number, displayedQuestionIndex: number) => {
+        const question = quiz.questions[originalQuestionIndex];
+        if ((question.type || "choice") !== "choice") return { ...question };
+        const canonicalOptions = question.options.map(
+          (_: string, index: number) => index,
+        );
+        const requestedOptions = attempt.optionOrders?.[displayedQuestionIndex];
+        const validOptionOrder =
+          Array.isArray(requestedOptions) &&
+          requestedOptions.length === canonicalOptions.length &&
+          new Set(requestedOptions).size === canonicalOptions.length &&
+          requestedOptions.every(
+            (index: number) => index >= 0 && index < canonicalOptions.length,
+          );
+        const optionOrder = validOptionOrder
+          ? requestedOptions
+          : canonicalOptions;
+        return {
+          ...question,
+          options: optionOrder.map((index: number) => question.options[index]),
+          correct: optionOrder.indexOf(question.correct),
+        };
+      },
+    );
+    const oversizedEssayIndex = questionSnapshot.findIndex(
       (question: any, index: number) => {
         if (question.type !== "essay") return false;
         const wordLimit = Math.min(
@@ -93,7 +129,7 @@ export async function POST(request: Request) {
         1000,
         Math.max(
           1,
-          Number(quiz.questions[oversizedEssayIndex].wordLimit) || 1000,
+          Number(questionSnapshot[oversizedEssayIndex].wordLimit) || 1000,
         ),
       );
       return NextResponse.json(
@@ -101,19 +137,19 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const correct = quiz.questions.filter(
+    const correct = questionSnapshot.filter(
       (question: any, index: number) =>
         (question.type || "choice") === "choice" &&
         answers[index] === question.correct,
     ).length;
-    const hasEssay = quiz.questions.some(
+    const hasEssay = questionSnapshot.some(
       (question: any) => question.type === "essay",
     );
-    const score = Math.round((correct / quiz.questions.length) * 100);
+    const score = Math.round((correct / questionSnapshot.length) * 100);
     attempt.correct = correct;
-    attempt.total = quiz.questions.length;
+    attempt.total = questionSnapshot.length;
     attempt.score = score;
-    attempt.questionSnapshot = quiz.questions;
+    attempt.questionSnapshot = questionSnapshot;
     attempt.passingScoreSnapshot = quiz.passingScore;
     attempt.essayGrades = {};
     attempt.essayComments = {};

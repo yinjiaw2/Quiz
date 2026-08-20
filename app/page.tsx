@@ -1085,6 +1085,9 @@ function QuestionBankManagement({
   saveBanks: (banks: QuestionBank[]) => void;
 }) {
   const [selectedId, setSelectedId] = useState(banks[0]?.id || "");
+  const [questionFilter, setQuestionFilter] = useState<
+    "all" | "choice" | "essay"
+  >("all");
   const selected = banks.find((bank) => bank.id === selectedId) || banks[0];
   const [draft, setDraft] = useState<QuestionBank | undefined>(selected);
   useEffect(() => {
@@ -1125,6 +1128,24 @@ function QuestionBankManagement({
       <div className="grid gap-6 xl:grid-cols-[280px_1fr]">
         <aside className="card h-fit p-4">
           <h2 className="px-2 font-bold">全部题库</h2>
+          <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
+            {[
+              ["all", "全部"],
+              ["choice", "选择题"],
+              ["essay", "策论题"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={`rounded-lg px-2 py-2 text-xs font-bold transition ${questionFilter === value ? "bg-white text-brand shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+                onClick={() =>
+                  setQuestionFilter(value as "all" | "choice" | "essay")
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="mt-3 space-y-2">
             {banks.map((bank) => (
               <button
@@ -1237,92 +1258,95 @@ function QuestionBankManagement({
                 </button>
               </div>
             </section>
-            {draft.questions.map((question, index) => (
-              <section className="card p-6" key={question.id}>
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-bold">
-                    第 {index + 1} 题 ·{" "}
-                    {(question.type ?? "choice") === "choice"
-                      ? "选择题"
-                      : "策论题"}
-                  </h3>
-                  <button
-                    className="icon-action text-rose-600"
-                    data-tooltip="删除此题"
-                    onClick={() =>
-                      setDraft({
-                        ...draft,
-                        questions: draft.questions.filter(
-                          (_, questionIndex) => questionIndex !== index,
-                        ),
-                      })
-                    }
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-                <label className="label mt-4">题干</label>
-                <textarea
-                  className="input min-h-28"
-                  value={question.text}
-                  onChange={(event) =>
-                    updateQuestion(index, { text: event.target.value })
-                  }
-                />
-                {(question.type ?? "choice") === "choice" ? (
-                  <div className="mt-4 space-y-3">
-                    {question.options.map((option, optionIndex) => (
-                      <div
-                        className="flex items-center gap-3"
-                        key={optionIndex}
-                      >
-                        <button
-                          className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-bold ${question.correct === optionIndex ? "bg-brand text-white" : "bg-slate-100 text-slate-500"}`}
-                          onClick={() =>
-                            updateQuestion(index, { correct: optionIndex })
-                          }
-                        >
-                          {String.fromCharCode(65 + optionIndex)}
-                        </button>
-                        <input
-                          className="input"
-                          value={option}
-                          onChange={(event) =>
-                            updateQuestion(index, {
-                              options: question.options.map(
-                                (item, itemIndex) =>
-                                  itemIndex === optionIndex
-                                    ? event.target.value
-                                    : item,
-                              ),
-                            })
-                          }
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-4 max-w-xs">
-                    <label className="label">最高字数</label>
-                    <input
-                      className="input"
-                      type="number"
-                      min="1"
-                      max="1000"
-                      value={question.wordLimit || 1000}
-                      onChange={(event) =>
-                        updateQuestion(index, {
-                          wordLimit: Math.min(
-                            1000,
-                            Math.max(1, +event.target.value),
+            {draft.questions.map((question, index) =>
+              questionFilter === "all" ||
+              (question.type ?? "choice") === questionFilter ? (
+                <section className="card p-6" key={question.id}>
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="font-bold">
+                      第 {index + 1} 题 ·{" "}
+                      {(question.type ?? "choice") === "choice"
+                        ? "选择题"
+                        : "策论题"}
+                    </h3>
+                    <button
+                      className="icon-action text-rose-600"
+                      data-tooltip="删除此题"
+                      onClick={() =>
+                        setDraft({
+                          ...draft,
+                          questions: draft.questions.filter(
+                            (_, questionIndex) => questionIndex !== index,
                           ),
                         })
                       }
-                    />
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                )}
-              </section>
-            ))}
+                  <label className="label mt-4">题干</label>
+                  <textarea
+                    className="input min-h-28"
+                    value={question.text}
+                    onChange={(event) =>
+                      updateQuestion(index, { text: event.target.value })
+                    }
+                  />
+                  {(question.type ?? "choice") === "choice" ? (
+                    <div className="mt-4 space-y-3">
+                      {question.options.map((option, optionIndex) => (
+                        <div
+                          className="flex items-center gap-3"
+                          key={optionIndex}
+                        >
+                          <button
+                            className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-bold ${question.correct === optionIndex ? "bg-brand text-white" : "bg-slate-100 text-slate-500"}`}
+                            onClick={() =>
+                              updateQuestion(index, { correct: optionIndex })
+                            }
+                          >
+                            {String.fromCharCode(65 + optionIndex)}
+                          </button>
+                          <input
+                            className="input"
+                            value={option}
+                            onChange={(event) =>
+                              updateQuestion(index, {
+                                options: question.options.map(
+                                  (item, itemIndex) =>
+                                    itemIndex === optionIndex
+                                      ? event.target.value
+                                      : item,
+                                ),
+                              })
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-4 max-w-xs">
+                      <label className="label">最高字数</label>
+                      <input
+                        className="input"
+                        type="number"
+                        min="1"
+                        max="1000"
+                        value={question.wordLimit || 1000}
+                        onChange={(event) =>
+                          updateQuestion(index, {
+                            wordLimit: Math.min(
+                              1000,
+                              Math.max(1, +event.target.value),
+                            ),
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                </section>
+              ) : null,
+            )}
           </div>
         ) : (
           <div className="card p-10 text-center text-slate-500">
@@ -1380,6 +1404,9 @@ function Builder({
   const [selectedBankQuestions, setSelectedBankQuestions] = useState<number[]>(
     [],
   );
+  const [bankQuestionFilter, setBankQuestionFilter] = useState<
+    "all" | "choice" | "essay"
+  >("all");
   const [titleError, setTitleError] = useState("");
   const [questionError, setQuestionError] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
@@ -1642,9 +1669,35 @@ function Builder({
                               清空选择
                             </button>
                           </div>
+                          <div className="flex gap-2 border-b border-slate-200 px-4 py-3">
+                            {[
+                              ["all", "全部"],
+                              ["choice", "选择题"],
+                              ["essay", "策论题"],
+                            ].map(([value, label]) => (
+                              <button
+                                key={value}
+                                type="button"
+                                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${bankQuestionFilter === value ? "bg-brand text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                                onClick={() =>
+                                  setBankQuestionFilter(
+                                    value as "all" | "choice" | "essay",
+                                  )
+                                }
+                              >
+                                {label}
+                              </button>
+                            ))}
+                          </div>
                           <div className="max-h-80 overflow-y-auto p-2">
                             {selectedQuestionBank.questions.map(
                               (bankQuestion, bankQuestionIndex) => {
+                                if (
+                                  bankQuestionFilter !== "all" &&
+                                  (bankQuestion.type ?? "choice") !==
+                                    bankQuestionFilter
+                                )
+                                  return null;
                                 const checked =
                                   selectedBankQuestions.includes(
                                     bankQuestionIndex,
@@ -2126,24 +2179,49 @@ function QuizTake({
   onComplete: (a: Attempt) => void;
   onExit: () => void;
 }) {
+  const [presentation] = useState(() => {
+    const shuffle = <T,>(items: T[]) => {
+      const next = [...items];
+      for (let index = next.length - 1; index > 0; index--) {
+        const target = Math.floor(Math.random() * (index + 1));
+        [next[index], next[target]] = [next[target], next[index]];
+      }
+      return next;
+    };
+    const questionOrder = shuffle(quiz.questions.map((_, index) => index));
+    const optionOrders: Record<number, number[]> = {};
+    const questions = questionOrder.map((originalQuestionIndex, index) => {
+      const question = quiz.questions[originalQuestionIndex];
+      if ((question.type ?? "choice") !== "choice") return { ...question };
+      const optionOrder = shuffle(question.options.map((_, option) => option));
+      optionOrders[index] = optionOrder;
+      return {
+        ...question,
+        options: optionOrder.map((option) => question.options[option]),
+        correct: optionOrder.indexOf(question.correct),
+      };
+    });
+    return { questions, questionOrder, optionOrders };
+  });
+  const randomizedQuiz = { ...quiz, questions: presentation.questions };
   const [answers, setAnswers] = useState<Record<number, number | string>>({});
   const [idx, setIdx] = useState(0);
   const [flags, setFlags] = useState<number[]>([]);
-  const [seconds, setSeconds] = useState(quiz.timeLimit * 60);
+  const [seconds, setSeconds] = useState(randomizedQuiz.timeLimit * 60);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [violations, setViolations] = useState({ tab: 0, fs: 0 });
-  const answered = quiz.questions.filter((question, index) => {
+  const answered = randomizedQuiz.questions.filter((question, index) => {
     const answer = answers[index];
     return (question.type ?? "choice") === "essay"
       ? typeof answer === "string" && answer.trim().length > 0
       : typeof answer === "number";
   }).length;
   const finish = () => {
-    const correct = quiz.questions.filter(
+    const correct = randomizedQuiz.questions.filter(
       (q, i) => (q.type ?? "choice") === "choice" && answers[i] === q.correct,
     ).length;
-    const score = Math.round((correct / quiz.questions.length) * 100);
-    const hasEssay = quiz.questions.some(
+    const score = Math.round((correct / randomizedQuiz.questions.length) * 100);
+    const hasEssay = randomizedQuiz.questions.some(
       (question) => question.type === "essay",
     );
     onComplete({
@@ -2153,9 +2231,12 @@ function QuizTake({
       date: new Date().toISOString(),
       score,
       correct,
-      total: quiz.questions.length,
+      total: randomizedQuiz.questions.length,
       timeUsed: Math.max(1, Math.ceil((quiz.timeLimit * 60 - seconds) / 60)),
       answers,
+      questionOrder: presentation.questionOrder,
+      optionOrders: presentation.optionOrders,
+      questionSnapshot: randomizedQuiz.questions,
       status: hasEssay
         ? "Pending"
         : score >= quiz.passingScore
@@ -2203,7 +2284,7 @@ function QuizTake({
     if (quiz.autoSubmit && violations.tab + violations.fs >= quiz.maxViolations)
       finish();
   }, [violations]);
-  const q = quiz.questions[idx];
+  const q = randomizedQuiz.questions[idx];
   const time = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
   return (
     <div className="min-h-screen bg-cream">
@@ -2236,13 +2317,13 @@ function QuizTake({
               <div
                 className="h-full rounded-full bg-brand transition-all"
                 style={{
-                  width: `${(answered / quiz.questions.length) * 100}%`,
+                  width: `${(answered / randomizedQuiz.questions.length) * 100}%`,
                 }}
               />
             </div>
             <span className="text-xs font-semibold text-slate-500">
-              {answered} / {quiz.questions.length} 已回答 ·{" "}
-              {Math.round((answered / quiz.questions.length) * 100)}%
+              {answered} / {randomizedQuiz.questions.length} 已回答 ·{" "}
+              {Math.round((answered / randomizedQuiz.questions.length) * 100)}%
             </span>
           </div>
         </div>
@@ -2256,7 +2337,7 @@ function QuizTake({
             </span>
           </div>
           <div className="mt-4 grid grid-cols-5 gap-2">
-            {quiz.questions.map((x, i) => {
+            {randomizedQuiz.questions.map((x, i) => {
               const answer = answers[i];
               const a =
                   (x.type ?? "choice") === "essay"
@@ -2308,7 +2389,7 @@ function QuizTake({
         <section className="card min-h-[560px] p-6 md:p-10">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold uppercase tracking-[.12em] text-brand">
-              Question {idx + 1} of {quiz.questions.length}
+              Question {idx + 1} of {randomizedQuiz.questions.length}
             </p>
             <button
               className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${flags.includes(idx) ? "bg-amber-50 text-amber-700" : "text-slate-500 hover:bg-slate-50"}`}
@@ -2382,7 +2463,7 @@ function QuizTake({
               <ArrowLeft size={16} />
               Previous
             </button>
-            {idx < quiz.questions.length - 1 ? (
+            {idx < randomizedQuiz.questions.length - 1 ? (
               <button className="btn-primary" onClick={() => setIdx(idx + 1)}>
                 Next
                 <ArrowRight size={16} />
@@ -3107,7 +3188,7 @@ export default function App() {
           } catch {}
           const learnerAttempt: Attempt = {
             ...a,
-            questionSnapshot: active.questions,
+            questionSnapshot: a.questionSnapshot || active.questions,
             passingScoreSnapshot: active.passingScore,
             correct: 0,
             total: 0,

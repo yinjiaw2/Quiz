@@ -43,6 +43,8 @@ export type Attempt = {
   total: number;
   timeUsed: number;
   answers: Record<number, number | string>;
+  questionOrder?: number[];
+  optionOrders?: Record<number, number[]>;
   questionSnapshot?: Question[];
   passingScoreSnapshot?: number;
   essayGrades?: Record<number, "Passed" | "Failed">;
