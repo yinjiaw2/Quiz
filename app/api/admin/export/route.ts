@@ -106,6 +106,13 @@ export async function GET(request: Request) {
       const renderQuestion = ({ question, index }: any) => {
         const answer = attempt.answers?.[index];
         const isEssay = question.type === "essay";
+        const essayTitle = isEssay
+          ? String(question.text || "")
+              .split("\n")
+              .map((line) => line.trim())
+              .find((line) => line.startsWith("《") && line.endsWith("》")) ||
+            "策论题"
+          : "";
         const learnerAnswer = isEssay
           ? typeof answer === "string" && answer.trim()
             ? answer
@@ -127,7 +134,7 @@ export async function GET(request: Request) {
             : "错误";
         return `
           <article class="question">
-            <h4>${index + 1}. ${escapeHtml(question.text)}</h4>
+            <h4>${index + 1}. ${escapeHtml(isEssay ? essayTitle : question.text)}</h4>
             <div class="answer"><strong>学员答案：</strong>${escapeHtml(learnerAnswer)}</div>
             ${!isEssay ? `<div><strong>正确答案：</strong>${escapeHtml(correctAnswer)}</div>` : ""}
             <div><strong>${isEssay ? "管理员评分" : "答题结果"}：</strong>${escapeHtml(grade)}</div>
