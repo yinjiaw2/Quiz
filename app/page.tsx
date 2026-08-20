@@ -846,7 +846,7 @@ function LearnerDetail({
             rel="noreferrer"
           >
             <Download size={17} />
-            A4 打印 / 保存 PDF
+            保存 PDF
           </a>
         }
       />
@@ -2013,15 +2013,20 @@ function ResultDetail({
     questionIndex: number,
     grade: "Passed" | "Failed" | undefined,
     comment: string,
+    grader: string,
   ) => Promise<void>;
 }) {
   const [reviewTab, setReviewTab] = useState<"choice" | "essay">("choice");
   const [essayComments, setEssayComments] = useState<Record<number, string>>(
     attempt.essayComments || {},
   );
+  const [essayGraders, setEssayGraders] = useState<Record<number, string>>(
+    attempt.essayGraders || {},
+  );
   useEffect(() => {
     setEssayComments(attempt.essayComments || {});
-  }, [attempt.id, attempt.essayComments]);
+    setEssayGraders(attempt.essayGraders || {});
+  }, [attempt.id, attempt.essayComments, attempt.essayGraders]);
   const canReview =
     admin ||
     quiz.resultsReleased ||
@@ -2054,13 +2059,26 @@ function ResultDetail({
       : "Failed";
   return (
     <>
-      <button
-        className="mb-5 flex items-center gap-2 text-sm font-semibold text-slate-500"
-        onClick={back}
-      >
-        <ArrowLeft size={16} />
-        返回考核结果
-      </button>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <button
+          className="flex items-center gap-2 text-sm font-semibold text-slate-500"
+          onClick={back}
+        >
+          <ArrowLeft size={16} />
+          返回考核结果
+        </button>
+        {admin && (
+          <a
+            className="btn-primary"
+            href={`/api/admin/export?attemptId=${encodeURIComponent(attempt.id)}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Download size={17} />
+            导出 PDF
+          </a>
+        )}
+      </div>
       <div className="mx-auto max-w-4xl">
         <section className="card overflow-hidden">
           <div
@@ -2158,6 +2176,18 @@ function ResultDetail({
                         </p>
                         {admin && onGrade && (
                           <div className="mt-4">
+                            <label className="label">批改人姓名</label>
+                            <input
+                              className="input mb-4"
+                              value={essayGraders[i] || ""}
+                              onChange={(event) =>
+                                setEssayGraders({
+                                  ...essayGraders,
+                                  [i]: event.target.value,
+                                })
+                              }
+                              placeholder="请输入批改人姓名"
+                            />
                             <label className="label">批改意见</label>
                             <textarea
                               className="input min-h-24"
@@ -2180,6 +2210,7 @@ function ResultDetail({
                                   i,
                                   undefined,
                                   essayComments[i] || "",
+                                  essayGraders[i] || "",
                                 )
                               }
                             >
@@ -2202,6 +2233,7 @@ function ResultDetail({
                                       i,
                                       "Passed",
                                       essayComments[i] || "",
+                                      essayGraders[i] || "",
                                     )
                                   }
                                 >
@@ -2214,6 +2246,7 @@ function ResultDetail({
                                       i,
                                       "Failed",
                                       essayComments[i] || "",
+                                      essayGraders[i] || "",
                                     )
                                   }
                                 >
@@ -2538,6 +2571,7 @@ export default function App() {
     questionIndex: number,
     grade: "Passed" | "Failed" | undefined,
     comment: string,
+    grader: string,
   ) => {
     if (!selected) return;
     try {
@@ -2549,6 +2583,7 @@ export default function App() {
           questionIndex,
           grade,
           comment,
+          grader,
         }),
       });
       const body = await response.json();

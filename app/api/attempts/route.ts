@@ -57,7 +57,7 @@ export async function GET() {
       const score = total ? Math.round((correct / total) * 100) : 0;
       const passingScore =
         stored.passingScoreSnapshot ?? quiz?.passingScore ?? 0;
-      const { essayGrades, essayComments, ...safe } = stored;
+      const { essayGrades, essayComments, essayGraders, ...safe } = stored;
       return {
         ...safe,
         correct,
@@ -152,6 +152,7 @@ export async function PATCH(request: Request) {
       questionIndex,
       grade,
       comment = "",
+      grader = "",
     } = await request.json();
     if (
       !attemptId ||
@@ -182,6 +183,13 @@ export async function PATCH(request: Request) {
     attempt.essayComments = {
       ...(attempt.essayComments || {}),
       [questionIndex]: String(comment).trim(),
+    };
+    attempt.essayGraders = {
+      ...(attempt.essayGraders || {}),
+      [questionIndex]:
+        String(grader).trim() ||
+        attempt.essayGraders?.[questionIndex] ||
+        session.name,
     };
     const choiceCorrect = questions.filter(
       (item: any, index: number) =>

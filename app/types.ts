@@ -40,6 +40,7 @@ export type Attempt = {
   passingScoreSnapshot?: number;
   essayGrades?: Record<number, "Passed" | "Failed">;
   essayComments?: Record<number, string>;
+  essayGraders?: Record<number, string>;
   status: "Passed" | "Failed" | "Pending";
   tabSwitches: number;
   fullscreenExits: number;

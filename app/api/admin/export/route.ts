@@ -20,6 +20,10 @@ const statusText = (status: string) =>
       ? "合格"
       : "不合格";
 
+const chineseAttemptNumber = (value: number) =>
+  ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"][value] ||
+  String(value);
+
 export async function GET(request: Request) {
   const session = await readSession();
   if (session?.role !== "admin")
@@ -30,7 +34,8 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const quizId = params.get("quizId");
     const learner = params.get("learner");
-    if (!quizId && !learner)
+    const attemptId = params.get("attemptId");
+    if (!quizId && !learner && !attemptId)
       return Response.json(
         { error: "请选择一个考核或学员后再导出" },
         { status: 400 },
@@ -38,12 +43,34 @@ export async function GET(request: Request) {
 
     const stateRows =
       await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
-    const attemptRows = learner
-      ? await sql`SELECT data FROM redbridge_attempts WHERE learner = ${learner} ORDER BY created_at ASC`
-      : await sql`SELECT data FROM redbridge_attempts WHERE quiz_id = ${quizId} ORDER BY learner ASC, created_at ASC`;
+    const attemptRows = attemptId
+      ? await sql`SELECT data FROM redbridge_attempts WHERE id = ${attemptId}`
+      : learner
+        ? await sql`SELECT data FROM redbridge_attempts WHERE learner = ${learner} ORDER BY created_at ASC`
+        : await sql`SELECT data FROM redbridge_attempts WHERE quiz_id = ${quizId} ORDER BY learner ASC, created_at ASC`;
     const quizzes = stateRows[0]?.data?.quizzes || seedQuizzes;
     const quizMap = new Map(quizzes.map((quiz: any) => [quiz.id, quiz]));
     const attempts = attemptRows.map((row) => row.data);
+
+    const occurrenceByAttempt = new Map<string, number>();
+    const occurrenceCounts = new Map<string, number>();
+    const registerOccurrence = (attempt: any) => {
+      const key = `${attempt.learner}\u0000${attempt.quizId}`;
+      const next = (occurrenceCounts.get(key) || 0) + 1;
+      occurrenceCounts.set(key, next);
+      occurrenceByAttempt.set(attempt.id, next);
+    };
+    if (attemptId && attempts[0]) {
+      const current = attempts[0];
+      const siblingRows = await sql`
+        SELECT data FROM redbridge_attempts
+        WHERE learner = ${current.learner} AND quiz_id = ${current.quizId}
+        ORDER BY created_at ASC
+      `;
+      siblingRows.forEach((row) => registerOccurrence(row.data));
+    } else {
+      attempts.forEach(registerOccurrence);
+    }
 
     if (learner) {
       attempts.sort((left, right) => {
@@ -58,10 +85,15 @@ export async function GET(request: Request) {
       });
     }
 
-    const pages = attempts.map((attempt, attemptIndex) => {
+    const pages = attempts.map((attempt) => {
       const quiz: any = quizMap.get(attempt.quizId);
       const questions = attempt.questionSnapshot || quiz?.questions || [];
       const quizTitle = quiz?.title || "原考核已删除（记录保留）";
+      const occurrence = occurrenceByAttempt.get(attempt.id) || 1;
+      const showOccurrence = (quiz?.maxAttempts ?? 1) > 1;
+      const testTitle = showOccurrence
+        ? `${quizTitle}第${chineseAttemptNumber(occurrence)}次`
+        : quizTitle;
       const choiceQuestions = questions
         .map((question: any, index: number) => ({ question, index }))
         .filter(
@@ -99,6 +131,7 @@ export async function GET(request: Request) {
             <div class="answer"><strong>学员答案：</strong>${escapeHtml(learnerAnswer)}</div>
             ${!isEssay ? `<div><strong>正确答案：</strong>${escapeHtml(correctAnswer)}</div>` : ""}
             <div><strong>${isEssay ? "管理员评分" : "答题结果"}：</strong>${escapeHtml(grade)}</div>
+            ${isEssay ? `<div><strong>批改人：</strong>${escapeHtml(attempt.essayGraders?.[index] || "未填写")}</div>` : ""}
             ${isEssay ? `<div class="comment"><strong>批改意见：</strong>${escapeHtml(attempt.essayComments?.[index] || "暂无批改意见")}</div>` : ""}
           </article>`;
       };
@@ -110,9 +143,9 @@ export async function GET(request: Request) {
         <section class="assessment-page">
           <header>
             <div class="brand">Redbridge 实习生考核</div>
-            <h1>${escapeHtml(quizTitle)}</h1>
+            <h1>${escapeHtml(testTitle)}</h1>
             <div class="meta">
-              ${learner ? `<span><strong>测试编号：</strong>${attemptIndex + 1}</span>` : `<span><strong>学员：</strong>${escapeHtml(attempt.learner)}</span>`}
+              <span><strong>姓名：</strong>${escapeHtml(attempt.learner)}</span>
               ${dateLine}
               <span><strong>结果：</strong>${escapeHtml(statusText(attempt.status))}</span>
               <span><strong>分数：</strong>${attempt.status === "Pending" ? "待评分" : `${escapeHtml(attempt.score)}%`}</span>
@@ -121,13 +154,15 @@ export async function GET(request: Request) {
           ${choiceQuestions.length ? `<h2>选择题</h2>${choiceQuestions.map(renderQuestion).join("")}` : ""}
           ${essayQuestions.length ? `<h2>策论题</h2>${essayQuestions.map(renderQuestion).join("")}` : ""}
           ${questions.length ? "" : '<p class="empty">此历史记录没有可用的题目快照。</p>'}
-          <footer>Redbridge 实习生考核 · ${learner ? `测试 ${attemptIndex + 1}` : escapeHtml(attempt.learner)}</footer>
+          <footer>Redbridge 实习生考核 · ${escapeHtml(testTitle)}</footer>
         </section>`;
     });
 
     const documentTitle = learner
       ? learner
-      : (quizMap.get(quizId) as any)?.title || "考核结果";
+      : attempts[0]
+        ? `${attempts[0].learner}-${(quizMap.get(attempts[0].quizId) as any)?.title || "考核结果"}`
+        : "考核结果";
     const html = `<!doctype html>
       <html lang="zh-CN"><head><meta charset="utf-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -137,8 +172,8 @@ export async function GET(request: Request) {
         * { box-sizing: border-box; }
         body { margin: 0; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", Arial, sans-serif; background: #eef2f0; }
         .print-button { position: fixed; top: 18px; right: 18px; z-index: 10; border: 0; border-radius: 10px; padding: 11px 18px; background: #2f6e55; color: white; font-weight: 700; cursor: pointer; box-shadow: 0 5px 18px #0002; }
-        .assessment-page { width: 210mm; min-height: 297mm; margin: 18px auto; padding: 14mm 15mm 16mm; background: white; page-break-after: always; break-after: page; }
-        .assessment-page:last-child { page-break-after: auto; break-after: auto; }
+        .assessment-page { width: 210mm; min-height: 297mm; margin: 18px auto; padding: 14mm 15mm 16mm; background: white; }
+        .assessment-page + .assessment-page { page-break-before: always; break-before: page; }
         header { border-bottom: 2px solid #2f6e55; padding-bottom: 12px; }
         .brand { color: #2f6e55; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
         h1 { margin: 8px 0 10px; font-size: 23px; }
@@ -156,7 +191,7 @@ export async function GET(request: Request) {
           .assessment-page { width: auto; min-height: auto; margin: 0; padding: 0; }
         }
       </style></head><body>
-      <button class="print-button" onclick="window.print()">打印 / 保存为 PDF</button>
+      <button class="print-button" onclick="window.print()">保存 PDF</button>
       ${pages.length ? pages.join("") : '<section class="assessment-page"><p class="empty">暂无可导出的考核记录。</p></section>'}
       <script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>
       </body></html>`;
