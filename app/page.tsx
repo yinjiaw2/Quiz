@@ -1094,7 +1094,9 @@ function Builder({
         ? buildQuestions(12, 1)
         : template === "essay"
           ? buildEssayQuestions(12, 1)
-          : buildDefaultQuestions();
+          : template === "other"
+            ? [blankQuestion(Date.now())]
+            : buildDefaultQuestions();
     setQ({ ...q, questions });
     setIdx(0);
     setQuestionError("");
@@ -1232,6 +1234,7 @@ function Builder({
                     <option value="mixed">10 道选择题 + 2 道策论题</option>
                     <option value="choice">12 道选择题</option>
                     <option value="essay">12 道策论题</option>
+                    <option value="other">其他（空白题库，逐题添加）</option>
                   </select>
                 </div>
               )}
@@ -1417,6 +1420,22 @@ function Builder({
                 </button>
               ))}
             </div>
+            <button
+              className="btn-secondary mt-4 w-full"
+              onClick={() => {
+                const nextQuestions = [
+                  ...q.questions,
+                  blankQuestion(Date.now()),
+                ];
+                setQ({ ...q, questions: nextQuestions });
+                setIdx(nextQuestions.length - 1);
+                setQuestionTemplate("other");
+                setQuestionError("");
+              }}
+            >
+              <Plus size={16} />
+              添加下一题
+            </button>
           </section>
           <section className="card p-5">
             <div className="flex items-center gap-2">
