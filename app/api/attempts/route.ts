@@ -44,13 +44,23 @@ export async function POST(request: Request) {
     const limit = Math.max(1, Number(quiz.maxAttempts) || 1);
     const answers = attempt.answers || {};
     const correct = quiz.questions.filter(
-      (question: any, index: number) => answers[index] === question.correct,
+      (question: any, index: number) =>
+        (question.type || "choice") === "choice" &&
+        answers[index] === question.correct,
     ).length;
+    const hasEssay = quiz.questions.some(
+      (question: any) => question.type === "essay",
+    );
     const score = Math.round((correct / quiz.questions.length) * 100);
     attempt.correct = correct;
     attempt.total = quiz.questions.length;
     attempt.score = score;
-    attempt.status = score >= quiz.passingScore ? "Passed" : "Failed";
+    attempt.essayGrades = {};
+    attempt.status = hasEssay
+      ? "Pending"
+      : score >= quiz.passingScore
+        ? "Passed"
+        : "Failed";
     const rows = await sql`
       WITH attempt_lock AS MATERIALIZED (
         SELECT pg_advisory_xact_lock(hashtext(${`${attempt.quizId}:${attempt.learner}`}))
@@ -76,5 +86,72 @@ export async function POST(request: Request) {
       { error: duplicate ? "该成绩已提交" : "成绩提交失败" },
       { status: duplicate ? 409 : 503 },
     );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const session = await readSession();
+    if (session?.role !== "admin")
+      return NextResponse.json({ error: "仅管理员可以评分" }, { status: 403 });
+    const { attemptId, questionIndex, grade } = await request.json();
+    if (
+      !attemptId ||
+      !Number.isInteger(questionIndex) ||
+      !["Passed", "Failed"].includes(grade)
+    )
+      return NextResponse.json({ error: "评分信息无效" }, { status: 400 });
+
+    const sql = await ensureSchema();
+    const attemptRows =
+      await sql`SELECT data FROM redbridge_attempts WHERE id = ${attemptId}`;
+    if (!attemptRows.length)
+      return NextResponse.json({ error: "提交记录不存在" }, { status: 404 });
+    const attempt = attemptRows[0].data;
+    const stateRows =
+      await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
+    const availableQuizzes = stateRows[0]?.data?.quizzes || seedQuizzes;
+    const quiz = availableQuizzes.find(
+      (item: any) => item.id === attempt.quizId,
+    );
+    const question = quiz?.questions?.[questionIndex];
+    if (!question || question.type !== "essay")
+      return NextResponse.json({ error: "该题不是策论题" }, { status: 400 });
+
+    attempt.essayGrades = {
+      ...(attempt.essayGrades || {}),
+      [questionIndex]: grade,
+    };
+    const choiceCorrect = quiz.questions.filter(
+      (item: any, index: number) =>
+        (item.type || "choice") === "choice" &&
+        attempt.answers?.[index] === item.correct,
+    ).length;
+    const essayIndexes = quiz.questions
+      .map((item: any, index: number) => (item.type === "essay" ? index : -1))
+      .filter((index: number) => index >= 0);
+    const essayPassed = essayIndexes.filter(
+      (index: number) => attempt.essayGrades[index] === "Passed",
+    ).length;
+    const allGraded = essayIndexes.every(
+      (index: number) => attempt.essayGrades[index],
+    );
+    attempt.correct = choiceCorrect + essayPassed;
+    attempt.total = quiz.questions.length;
+    attempt.score = Math.round((attempt.correct / attempt.total) * 100);
+    attempt.status = allGraded
+      ? attempt.score >= quiz.passingScore
+        ? "Passed"
+        : "Failed"
+      : "Pending";
+    const rows = await sql`
+      UPDATE redbridge_attempts
+      SET data = ${JSON.stringify(attempt)}::jsonb
+      WHERE id = ${attemptId}
+      RETURNING data
+    `;
+    return NextResponse.json(rows[0].data);
+  } catch (error) {
+    return NextResponse.json({ error: String(error) }, { status: 503 });
   }
 }

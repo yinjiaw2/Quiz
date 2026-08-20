@@ -1,6 +1,7 @@
 export type Role = "admin" | "learner";
 export type Question = {
   id: number;
+  type?: "choice" | "essay";
   text: string;
   options: string[];
   correct: number;
@@ -34,8 +35,9 @@ export type Attempt = {
   correct: number;
   total: number;
   timeUsed: number;
-  answers: Record<number, number>;
-  status: "Passed" | "Failed";
+  answers: Record<number, number | string>;
+  essayGrades?: Record<number, "Passed" | "Failed">;
+  status: "Passed" | "Failed" | "Pending";
   tabSwitches: number;
   fullscreenExits: number;
 };

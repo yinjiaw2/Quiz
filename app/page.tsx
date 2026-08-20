@@ -67,9 +67,13 @@ const badge = (s: string) =>
       ? "bg-rose-50 text-rose-700"
       : "bg-amber-50 text-amber-700";
 const statusText = (s: string) =>
-  ({ Passed: "通过", Failed: "未通过", Published: "已发布", Draft: "草稿" })[
-    s
-  ] || s;
+  ({
+    Passed: "合格",
+    Failed: "不合格",
+    Pending: "待管理员评分",
+    Published: "已发布",
+    Draft: "草稿",
+  })[s] || s;
 
 function Logo({ inverse = false }: { inverse?: boolean }) {
   return (
@@ -485,12 +489,15 @@ function AdminDashboard({
   setView: (v: View) => void;
 }) {
   const names = Object.fromEntries(quizzes.map((q) => [q.id, q.title]));
-  const avg = attempts.length
-    ? Math.round(attempts.reduce((a, b) => a + b.score, 0) / attempts.length)
+  const gradedAttempts = attempts.filter((a) => a.status !== "Pending");
+  const avg = gradedAttempts.length
+    ? Math.round(
+        gradedAttempts.reduce((a, b) => a + b.score, 0) / gradedAttempts.length,
+      )
     : 0;
   const passed = attempts.filter((a) => a.status === "Passed").length;
-  const passRate = attempts.length
-    ? Math.round((passed / attempts.length) * 100)
+  const passRate = gradedAttempts.length
+    ? Math.round((passed / gradedAttempts.length) * 100)
     : 0;
   const today = new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
@@ -609,9 +616,13 @@ function ResultTable({
               <td className="px-5 py-4 text-slate-600">
                 {names[a.quizId] || "已归档考核"}
               </td>
-              <td className="px-5 py-4 font-bold">{a.score}%</td>
+              <td className="px-5 py-4 font-bold">
+                {a.status === "Pending" ? "待评分" : `${a.score}%`}
+              </td>
               <td className="px-5 py-4 text-slate-600">
-                {a.correct} / {a.total}
+                {a.status === "Pending"
+                  ? "待评分"
+                  : `${a.correct} / ${a.total}`}
               </td>
               <td className="px-5 py-4 text-slate-600">{a.timeUsed} 分钟</td>
               <td className="px-5 py-4 text-slate-600">
@@ -851,15 +862,22 @@ function AdminQuizzes({
   edit: (q?: Quiz) => void;
 }) {
   const statsByQuiz = attempts.reduce<
-    Record<string, { submissions: number; totalScore: number }>
+    Record<
+      string,
+      { submissions: number; gradedSubmissions: number; totalScore: number }
+    >
   >((stats, attempt) => {
     const current = stats[attempt.quizId] || {
       submissions: 0,
+      gradedSubmissions: 0,
       totalScore: 0,
     };
     stats[attempt.quizId] = {
       submissions: current.submissions + 1,
-      totalScore: current.totalScore + attempt.score,
+      gradedSubmissions:
+        current.gradedSubmissions + (attempt.status === "Pending" ? 0 : 1),
+      totalScore:
+        current.totalScore + (attempt.status === "Pending" ? 0 : attempt.score),
     };
     return stats;
   }, {});
@@ -931,8 +949,8 @@ function AdminQuizzes({
                     {statsByQuiz[q.id]?.submissions ?? 0}
                   </td>
                   <td className="px-5 font-semibold">
-                    {statsByQuiz[q.id]?.submissions
-                      ? `${Math.round(statsByQuiz[q.id].totalScore / statsByQuiz[q.id].submissions)}%`
+                    {statsByQuiz[q.id]?.gradedSubmissions
+                      ? `${Math.round(statsByQuiz[q.id].totalScore / statsByQuiz[q.id].gradedSubmissions)}%`
                       : "—"}
                   </td>
                   <td className="px-5">
@@ -1009,6 +1027,14 @@ function Builder({
   onSave: (q: Quiz) => void;
   onCancel: () => void;
 }) {
+  const blankQuestion = (id: number) => ({
+    id,
+    type: "choice" as const,
+    text: "",
+    options: ["", "", "", ""],
+    correct: 0,
+    explanation: "",
+  });
   const [q, setQ] = useState<Quiz>(
     initial || {
       id: crypto.randomUUID(),
@@ -1044,6 +1070,14 @@ function Builder({
         i === idx ? { ...x, ...patch } : x,
       ),
     });
+  const setQuestionCount = (count: number) => {
+    const nextCount = Math.max(1, Math.min(200, count || 1));
+    const questions = Array.from({ length: nextCount }, (_, i) =>
+      q.questions[i] ? q.questions[i] : blankQuestion(Date.now() + i),
+    );
+    setQ({ ...q, questions });
+    setIdx((current) => Math.min(current, nextCount - 1));
+  };
   const validateAndSave = () => {
     setTitleError("");
     setQuestionError("");
@@ -1060,12 +1094,14 @@ function Builder({
     }
     const invalidQuestion = q.questions.findIndex(
       (item) =>
-        !item.text.trim() || item.options.some((option) => !option.trim()),
+        !item.text.trim() ||
+        ((item.type ?? "choice") === "choice" &&
+          item.options.some((option) => !option.trim())),
     );
     if (invalidQuestion !== -1) {
       setIdx(invalidQuestion);
       setQuestionError(
-        `第 ${invalidQuestion + 1} 题内容不完整，请填写题目和所有选项。`,
+        `第 ${invalidQuestion + 1} 题内容不完整，请填写题目${(q.questions[invalidQuestion].type ?? "choice") === "choice" ? "和所有选项" : ""}。`,
       );
       requestAnimationFrame(() =>
         questionSectionRef.current?.scrollIntoView({
@@ -1082,7 +1118,7 @@ function Builder({
       <PageTitle
         eyebrow="Quiz builder"
         title={initial ? "Edit quiz" : "Create a new quiz"}
-        desc="Configure the assessment and complete all 25 questions."
+        desc="设置题目数量，并自由组合选择题与策论题。"
         action={
           <div className="flex gap-2">
             <button className="btn-secondary" onClick={onCancel}>
@@ -1165,6 +1201,17 @@ function Builder({
                 </div>
               </div>
               <div>
+                <label className="label">题目总数</label>
+                <input
+                  className="input"
+                  type="number"
+                  min="1"
+                  max="200"
+                  value={q.questions.length}
+                  onChange={(e) => setQuestionCount(+e.target.value)}
+                />
+              </div>
+              <div>
                 <label className="label">Time limit (minutes)</label>
                 <input
                   className="input"
@@ -1217,11 +1264,20 @@ function Builder({
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-bold uppercase text-brand">
-                  Question {idx + 1} of 25
+                  Question {idx + 1} of {q.questions.length}
                 </p>
                 <h2 className="mt-1 font-bold">Question content</h2>
               </div>
-              <span className="text-xs text-slate-400">Single choice</span>
+              <select
+                className="input max-w-36"
+                value={question.type ?? "choice"}
+                onChange={(e) =>
+                  uq({ type: e.target.value as "choice" | "essay" })
+                }
+              >
+                <option value="choice">选择题</option>
+                <option value="essay">策论题</option>
+              </select>
             </div>
             {questionError && (
               <div className="mt-4 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700">
@@ -1238,36 +1294,47 @@ function Builder({
                 setQuestionError("");
               }}
             />
-            <div className="mt-4 grid gap-3">
-              {question.options.map((o, oi) => (
-                <div key={oi} className="flex items-center gap-3">
-                  <button
-                    onClick={() => uq({ correct: oi })}
-                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-bold ${question.correct === oi ? "bg-brand text-white" : "bg-slate-100 text-slate-500"}`}
-                  >
-                    {String.fromCharCode(65 + oi)}
-                  </button>
-                  <input
-                    className="input"
-                    value={o}
-                    onChange={(e) => {
-                      uq({
-                        options: question.options.map((x, j) =>
-                          j === oi ? e.target.value : x,
-                        ),
-                      });
-                      setQuestionError("");
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-            <label className="label mt-5">Explanation (optional)</label>
-            <textarea
-              className="input"
-              value={question.explanation}
-              onChange={(e) => uq({ explanation: e.target.value })}
-            />
+            {(question.type ?? "choice") === "choice" ? (
+              <div className="mt-4 grid gap-3">
+                {question.options.map((o, oi) => (
+                  <div key={oi} className="flex items-center gap-3">
+                    <button
+                      onClick={() => uq({ correct: oi })}
+                      className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-bold ${question.correct === oi ? "bg-brand text-white" : "bg-slate-100 text-slate-500"}`}
+                    >
+                      {String.fromCharCode(65 + oi)}
+                    </button>
+                    <input
+                      className="input"
+                      value={o}
+                      onChange={(e) => {
+                        uq({
+                          options: question.options.map((x, j) =>
+                            j === oi ? e.target.value : x,
+                          ),
+                        });
+                        setQuestionError("");
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
+                学员将填写约 200
+                字的文字回答，并看到实时字数。提交后由管理员评为合格或不合格。
+              </div>
+            )}
+            {(question.type ?? "choice") === "choice" && (
+              <>
+                <label className="label mt-5">Explanation (optional)</label>
+                <textarea
+                  className="input"
+                  value={question.explanation}
+                  onChange={(e) => uq({ explanation: e.target.value })}
+                />
+              </>
+            )}
             <div className="mt-5 flex justify-between">
               <button
                 className="btn-secondary"
@@ -1279,7 +1346,7 @@ function Builder({
               </button>
               <button
                 className="btn-secondary"
-                disabled={idx === 24}
+                disabled={idx === q.questions.length - 1}
                 onClick={() => setIdx(idx + 1)}
               >
                 Next
@@ -1382,10 +1449,13 @@ function LearnerDashboard({
   const completedCount = publishedQuizzes.filter((quiz) =>
     completedQuizIds.has(quiz.id),
   ).length;
-  const averageScore = learnerAttempts.length
+  const gradedLearnerAttempts = learnerAttempts.filter(
+    (attempt) => attempt.status !== "Pending",
+  );
+  const averageScore = gradedLearnerAttempts.length
     ? Math.round(
-        learnerAttempts.reduce((sum, attempt) => sum + attempt.score, 0) /
-          learnerAttempts.length,
+        gradedLearnerAttempts.reduce((sum, attempt) => sum + attempt.score, 0) /
+          gradedLearnerAttempts.length,
       )
     : 0;
   const completionRate = publishedQuizzes.length
@@ -1526,18 +1596,26 @@ function QuizTake({
   onComplete: (a: Attempt) => void;
   onExit: () => void;
 }) {
-  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [answers, setAnswers] = useState<Record<number, number | string>>({});
   const [idx, setIdx] = useState(0);
   const [flags, setFlags] = useState<number[]>([]);
   const [seconds, setSeconds] = useState(quiz.timeLimit * 60);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [violations, setViolations] = useState({ tab: 0, fs: 0 });
-  const answered = Object.keys(answers).length;
+  const answered = quiz.questions.filter((question, index) => {
+    const answer = answers[index];
+    return (question.type ?? "choice") === "essay"
+      ? typeof answer === "string" && answer.trim().length > 0
+      : typeof answer === "number";
+  }).length;
   const finish = () => {
     const correct = quiz.questions.filter(
-      (q, i) => answers[i] === q.correct,
+      (q, i) => (q.type ?? "choice") === "choice" && answers[i] === q.correct,
     ).length;
     const score = Math.round((correct / quiz.questions.length) * 100);
+    const hasEssay = quiz.questions.some(
+      (question) => question.type === "essay",
+    );
     onComplete({
       id: crypto.randomUUID(),
       quizId: quiz.id,
@@ -1548,7 +1626,11 @@ function QuizTake({
       total: quiz.questions.length,
       timeUsed: Math.max(1, Math.ceil((quiz.timeLimit * 60 - seconds) / 60)),
       answers,
-      status: score >= quiz.passingScore ? "Passed" : "Failed",
+      status: hasEssay
+        ? "Pending"
+        : score >= quiz.passingScore
+          ? "Passed"
+          : "Failed",
       tabSwitches: violations.tab,
       fullscreenExits: violations.fs,
     });
@@ -1623,11 +1705,14 @@ function QuizTake({
             <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
               <div
                 className="h-full rounded-full bg-brand transition-all"
-                style={{ width: `${(answered / 25) * 100}%` }}
+                style={{
+                  width: `${(answered / quiz.questions.length) * 100}%`,
+                }}
               />
             </div>
             <span className="text-xs font-semibold text-slate-500">
-              {answered} / 25 answered · {Math.round((answered / 25) * 100)}%
+              {answered} / {quiz.questions.length} 已回答 ·{" "}
+              {Math.round((answered / quiz.questions.length) * 100)}%
             </span>
           </div>
         </div>
@@ -1642,7 +1727,11 @@ function QuizTake({
           </div>
           <div className="mt-4 grid grid-cols-5 gap-2">
             {quiz.questions.map((x, i) => {
-              const a = answers[i] !== undefined,
+              const answer = answers[i];
+              const a =
+                  (x.type ?? "choice") === "essay"
+                    ? typeof answer === "string" && answer.trim().length > 0
+                    : typeof answer === "number",
                 f = flags.includes(i);
               return (
                 <button
@@ -1689,7 +1778,7 @@ function QuizTake({
         <section className="card min-h-[560px] p-6 md:p-10">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold uppercase tracking-[.12em] text-brand">
-              Question {idx + 1} of 25
+              Question {idx + 1} of {quiz.questions.length}
             </p>
             <button
               className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${flags.includes(idx) ? "bg-amber-50 text-amber-700" : "text-slate-500 hover:bg-slate-50"}`}
@@ -1711,22 +1800,46 @@ function QuizTake({
           <h2 className="mt-7 max-w-3xl text-2xl font-semibold leading-9">
             {q.text}
           </h2>
-          <div className="mt-8 grid gap-3">
-            {q.options.map((o, i) => (
-              <button
-                key={i}
-                onClick={() => setAnswers({ ...answers, [idx]: i })}
-                className={`flex items-center gap-4 rounded-xl border p-4 text-left transition ${answers[idx] === i ? "border-brand bg-mint ring-1 ring-brand" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
-              >
-                <span
-                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-bold ${answers[idx] === i ? "bg-brand text-white" : "bg-slate-100 text-slate-600"}`}
+          {(q.type ?? "choice") === "choice" ? (
+            <div className="mt-8 grid gap-3">
+              {q.options.map((o, i) => (
+                <button
+                  key={i}
+                  onClick={() => setAnswers({ ...answers, [idx]: i })}
+                  className={`flex items-center gap-4 rounded-xl border p-4 text-left transition ${answers[idx] === i ? "border-brand bg-mint ring-1 ring-brand" : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"}`}
                 >
-                  {String.fromCharCode(65 + i)}
+                  <span
+                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-bold ${answers[idx] === i ? "bg-brand text-white" : "bg-slate-100 text-slate-600"}`}
+                  >
+                    {String.fromCharCode(65 + i)}
+                  </span>
+                  <span className="font-medium">{o}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-8">
+              <textarea
+                className="input min-h-64 resize-y text-base leading-7"
+                value={typeof answers[idx] === "string" ? answers[idx] : ""}
+                onChange={(e) =>
+                  setAnswers({ ...answers, [idx]: e.target.value })
+                }
+                placeholder="请在这里填写约 200 字的回答……"
+              />
+              <div className="mt-2 flex justify-between text-sm">
+                <span className="text-slate-500">建议回答约 200 字</span>
+                <span
+                  className={`font-bold ${(typeof answers[idx] === "string" ? answers[idx].trim().length : 0) >= 180 ? "text-emerald-700" : "text-slate-500"}`}
+                >
+                  当前字数：
+                  {typeof answers[idx] === "string"
+                    ? answers[idx].trim().length
+                    : 0}
                 </span>
-                <span className="font-medium">{o}</span>
-              </button>
-            ))}
-          </div>
+              </div>
+            </div>
+          )}
           <div className="mt-10 flex justify-between border-t border-slate-100 pt-6">
             <button
               className="btn-secondary"
@@ -1736,7 +1849,7 @@ function QuizTake({
               <ArrowLeft size={16} />
               Previous
             </button>
-            {idx < 24 ? (
+            {idx < quiz.questions.length - 1 ? (
               <button className="btn-primary" onClick={() => setIdx(idx + 1)}>
                 Next
                 <ArrowRight size={16} />
@@ -1764,10 +1877,10 @@ function QuizTake({
             </Dialog.Title>
             <Dialog.Description className="mt-2 text-sm leading-6 text-slate-500">
               You have answered{" "}
-              <strong className="text-slate-800">{answered} of 25</strong>{" "}
-              questions. {25 - answered}{" "}
-              {25 - answered === 1 ? "question is" : "questions are"}{" "}
-              unanswered.
+              <strong className="text-slate-800">
+                {answered} / {quiz.questions.length}
+              </strong>{" "}
+              题，仍有 {quiz.questions.length - answered} 题未回答。
             </Dialog.Description>
             <div className="mt-6 flex justify-end gap-2">
               <Dialog.Close className="btn-secondary">
@@ -1789,11 +1902,16 @@ function ResultDetail({
   quiz,
   back,
   admin = false,
+  onGrade,
 }: {
   attempt: Attempt;
   quiz: Quiz;
   back: () => void;
   admin?: boolean;
+  onGrade?: (
+    questionIndex: number,
+    grade: "Passed" | "Failed",
+  ) => Promise<void>;
 }) {
   const canReview =
     admin ||
@@ -1813,13 +1931,15 @@ function ResultDetail({
       <div className="mx-auto max-w-4xl">
         <section className="card overflow-hidden">
           <div
-            className={`p-8 text-center ${attempt.status === "Passed" ? "bg-[#edf7f1]" : "bg-rose-50"}`}
+            className={`p-8 text-center ${attempt.status === "Passed" ? "bg-[#edf7f1]" : attempt.status === "Pending" ? "bg-amber-50" : "bg-rose-50"}`}
           >
             <div
-              className={`mx-auto grid h-16 w-16 place-items-center rounded-full bg-white ${attempt.status === "Passed" ? "text-brand" : "text-rose-600"}`}
+              className={`mx-auto grid h-16 w-16 place-items-center rounded-full bg-white ${attempt.status === "Passed" ? "text-brand" : attempt.status === "Pending" ? "text-amber-600" : "text-rose-600"}`}
             >
               {attempt.status === "Passed" ? (
                 <Trophy size={30} />
+              ) : attempt.status === "Pending" ? (
+                <Clock3 size={30} />
               ) : (
                 <AlertTriangle size={30} />
               )}
@@ -1827,9 +1947,13 @@ function ResultDetail({
             <p className="mt-4 text-sm font-bold tracking-widest">
               {statusText(attempt.status)}
             </p>
-            <h1 className="mt-2 text-5xl font-bold">{attempt.score}%</h1>
+            <h1 className="mt-2 text-5xl font-bold">
+              {attempt.status === "Pending" ? "—" : `${attempt.score}%`}
+            </h1>
             <p className="mt-2 text-slate-600">
-              答对 {attempt.correct} / {attempt.total} 题 · {quiz.title}
+              {attempt.status === "Pending"
+                ? `策论题评分完成后生成最终成绩 · ${quiz.title}`
+                : `答对 ${attempt.correct} / ${attempt.total} 题 · ${quiz.title}`}
             </p>
           </div>
           <div className="grid grid-cols-3 divide-x divide-slate-100 p-6 text-center">
@@ -1866,19 +1990,61 @@ function ResultDetail({
                     <p className="font-semibold">
                       {i + 1}. {q.text}
                     </p>
-                    <p
-                      className={`mt-2 text-sm ${ok ? "text-emerald-700" : "text-rose-600"}`}
-                    >
-                      学员答案：{a === undefined ? "未记录" : q.options[a]}
-                    </p>
-                    {!ok && (
-                      <p className="mt-1 text-sm text-emerald-700">
-                        正确答案：{q.options[q.correct]}
-                      </p>
+                    {(q.type ?? "choice") === "essay" ? (
+                      <>
+                        <div className="mt-3 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-7 text-slate-700">
+                          {typeof a === "string" && a.trim() ? a : "学员未作答"}
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500">
+                          回答字数：
+                          {typeof a === "string" ? a.trim().length : 0}
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-slate-600">
+                            管理员评分：
+                          </span>
+                          {admin && onGrade ? (
+                            <>
+                              <button
+                                className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Passed" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+                                onClick={() => void onGrade(i, "Passed")}
+                              >
+                                合格
+                              </button>
+                              <button
+                                className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Failed" ? "bg-rose-600 text-white" : "bg-rose-50 text-rose-700 hover:bg-rose-100"}`}
+                                onClick={() => void onGrade(i, "Failed")}
+                              >
+                                不合格
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-sm font-bold text-amber-700">
+                              {attempt.essayGrades?.[i]
+                                ? statusText(attempt.essayGrades[i])
+                                : "待评分"}
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p
+                          className={`mt-2 text-sm ${ok ? "text-emerald-700" : "text-rose-600"}`}
+                        >
+                          学员答案：
+                          {typeof a === "number" ? q.options[a] : "未记录"}
+                        </p>
+                        {!ok && (
+                          <p className="mt-1 text-sm text-emerald-700">
+                            正确答案：{q.options[q.correct]}
+                          </p>
+                        )}
+                        <p className="mt-2 text-xs text-slate-500">
+                          {q.explanation}
+                        </p>
+                      </>
                     )}
-                    <p className="mt-2 text-xs text-slate-500">
-                      {q.explanation}
-                    </p>
                   </div>
                 );
               })}
@@ -2154,6 +2320,37 @@ export default function App() {
       alert("无法连接后端，密码重置失败");
     }
   };
+  const gradeEssay = async (
+    questionIndex: number,
+    grade: "Passed" | "Failed",
+  ) => {
+    if (!selected) return;
+    try {
+      const response = await fetch("/api/attempts", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attemptId: selected.id,
+          questionIndex,
+          grade,
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) {
+        alert(body.error || "评分保存失败");
+        return;
+      }
+      const updated = body as Attempt;
+      setSelected(updated);
+      setAttempts((current) =>
+        current.map((attempt) =>
+          attempt.id === updated.id ? updated : attempt,
+        ),
+      );
+    } catch {
+      alert("无法连接后端，评分保存失败");
+    }
+  };
   if (!role)
     return (
       <Login
@@ -2243,6 +2440,7 @@ export default function App() {
         attempt={selected}
         quiz={quiz}
         admin={role === "admin"}
+        onGrade={role === "admin" ? gradeEssay : undefined}
         back={() => setView(resultBack)}
       />
     );
