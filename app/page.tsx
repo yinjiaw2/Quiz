@@ -1080,7 +1080,7 @@ function Builder({
       ),
     });
   const setQuestionCount = (count: number) => {
-    const nextCount = Math.max(1, Math.min(200, count || 1));
+    const nextCount = Math.max(1, Math.min(25, count || 1));
     const questions = Array.from({ length: nextCount }, (_, i) =>
       q.questions[i] ? q.questions[i] : blankQuestion(Date.now() + i),
     );
@@ -1099,6 +1099,14 @@ function Builder({
             : buildDefaultQuestions();
     setQ({ ...q, questions });
     setIdx(0);
+    setQuestionError("");
+  };
+  const addQuestion = () => {
+    if (q.questions.length >= 25) return;
+    const nextQuestions = [...q.questions, blankQuestion(Date.now())];
+    setQ({ ...q, questions: nextQuestions });
+    setIdx(nextQuestions.length - 1);
+    setQuestionTemplate("other");
     setQuestionError("");
   };
   const validateAndSave = () => {
@@ -1244,7 +1252,7 @@ function Builder({
                   className="input"
                   type="number"
                   min="1"
-                  max="200"
+                  max="25"
                   value={q.questions.length}
                   onChange={(e) => setQuestionCount(+e.target.value)}
                 />
@@ -1384,10 +1392,18 @@ function Builder({
               </button>
               <button
                 className="btn-secondary"
-                disabled={idx === q.questions.length - 1}
-                onClick={() => setIdx(idx + 1)}
+                disabled={
+                  idx === q.questions.length - 1 && q.questions.length >= 25
+                }
+                onClick={() =>
+                  idx === q.questions.length - 1
+                    ? addQuestion()
+                    : setIdx(idx + 1)
+                }
               >
-                Next
+                {idx === q.questions.length - 1 && q.questions.length < 25
+                  ? "Next（新增题目）"
+                  : "Next"}
                 <ArrowRight size={16} />
               </button>
             </div>
@@ -1422,19 +1438,11 @@ function Builder({
             </div>
             <button
               className="btn-secondary mt-4 w-full"
-              onClick={() => {
-                const nextQuestions = [
-                  ...q.questions,
-                  blankQuestion(Date.now()),
-                ];
-                setQ({ ...q, questions: nextQuestions });
-                setIdx(nextQuestions.length - 1);
-                setQuestionTemplate("other");
-                setQuestionError("");
-              }}
+              disabled={q.questions.length >= 25}
+              onClick={addQuestion}
             >
               <Plus size={16} />
-              添加下一题
+              {q.questions.length >= 25 ? "已达到 25 题上限" : "添加下一题"}
             </button>
           </section>
           <section className="card p-5">
