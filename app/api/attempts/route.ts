@@ -142,12 +142,15 @@ export async function POST(request: Request) {
         (question.type || "choice") === "choice" &&
         answers[index] === question.correct,
     ).length;
+    const choiceTotal = questionSnapshot.filter(
+      (question: any) => (question.type || "choice") === "choice",
+    ).length;
     const hasEssay = questionSnapshot.some(
       (question: any) => question.type === "essay",
     );
-    const score = Math.round((correct / questionSnapshot.length) * 100);
+    const score = choiceTotal ? Math.round((correct / choiceTotal) * 100) : 0;
     attempt.correct = correct;
-    attempt.total = questionSnapshot.length;
+    attempt.total = choiceTotal;
     attempt.score = score;
     attempt.questionSnapshot = questionSnapshot;
     attempt.passingScoreSnapshot = quiz.passingScore;
@@ -251,15 +254,17 @@ export async function PATCH(request: Request) {
     const essayIndexes = questions
       .map((item: any, index: number) => (item.type === "essay" ? index : -1))
       .filter((index: number) => index >= 0);
-    const essayPassed = essayIndexes.filter(
-      (index: number) => attempt.essayGrades[index] === "Passed",
-    ).length;
     const allGraded = essayIndexes.every(
       (index: number) => attempt.essayGrades[index],
     );
-    attempt.correct = choiceCorrect + essayPassed;
-    attempt.total = questions.length;
-    attempt.score = Math.round((attempt.correct / attempt.total) * 100);
+    const choiceTotal = questions.filter(
+      (item: any) => (item.type || "choice") === "choice",
+    ).length;
+    attempt.correct = choiceCorrect;
+    attempt.total = choiceTotal;
+    attempt.score = choiceTotal
+      ? Math.round((choiceCorrect / choiceTotal) * 100)
+      : 0;
     attempt.status = allGraded
       ? attempt.score >= (attempt.passingScoreSnapshot ?? quiz.passingScore)
         ? "Passed"

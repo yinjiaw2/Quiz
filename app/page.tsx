@@ -1412,6 +1412,9 @@ function Builder({
   const titleRef = useRef<HTMLInputElement>(null);
   const questionSectionRef = useRef<HTMLElement>(null);
   const question = q.questions[idx];
+  const choiceQuestionCount = q.questions.filter(
+    (item) => (item.type ?? "choice") === "choice",
+  ).length;
   const update = (patch: any) => setQ({ ...q, ...patch });
   const uq = (patch: any) =>
     setQ({
@@ -1597,24 +1600,25 @@ function Builder({
                     className="input"
                     type="number"
                     min="1"
-                    max={q.questions.length}
+                    max={Math.max(1, choiceQuestionCount)}
+                    disabled={!choiceQuestionCount}
                     value={Math.round(
-                      (q.passingScore / 100) * q.questions.length,
+                      (q.passingScore / 100) * choiceQuestionCount,
                     )}
                     onChange={(e) => {
                       const required = Math.min(
-                        q.questions.length,
+                        choiceQuestionCount,
                         Math.max(1, +e.target.value),
                       );
                       update({
                         passingScore: Math.round(
-                          (required / q.questions.length) * 100,
+                          (required / choiceQuestionCount) * 100,
                         ),
                       });
                     }}
                   />
                   <span className="shrink-0 font-bold text-slate-500">
-                    / {q.questions.length} 题
+                    / {choiceQuestionCount} 道选择题
                   </span>
                 </div>
               </div>
@@ -2170,6 +2174,64 @@ function LearnerDashboard({
   );
 }
 
+function EssayPrompt({ text, numbered }: { text: string; numbered?: number }) {
+  const lines = text.split("\n");
+  return (
+    <div className="space-y-3 text-left text-slate-800">
+      {lines.map((line, index) => {
+        const value = line.trim();
+        if (!value) return <div className="h-2" key={index} />;
+        if (index === 0 && value === "州经理选拔策论题")
+          return (
+            <h2 className="text-2xl font-bold text-slate-950" key={index}>
+              {numbered ? `${numbered}. ` : ""}
+              {value}
+            </h2>
+          );
+        if (["题目", "背景材料", "策论要求"].includes(value))
+          return (
+            <h3
+              className="border-b border-slate-200 pb-2 pt-2 text-xl font-bold text-slate-950"
+              key={index}
+            >
+              {value}
+            </h3>
+          );
+        if (/^[一二三四五六]、/.test(value))
+          return (
+            <h4 className="pt-2 text-lg font-bold text-brand" key={index}>
+              {value}
+            </h4>
+          );
+        if (value.startsWith("•"))
+          return (
+            <div
+              className={`${line.startsWith("  ") ? "ml-8" : "ml-3"} flex gap-3 leading-7`}
+              key={index}
+            >
+              <span className="font-bold text-brand">•</span>
+              <span>{value.slice(1).trim()}</span>
+            </div>
+          );
+        if (/^\d+\./.test(value))
+          return (
+            <p className="pl-1 font-medium leading-7" key={index}>
+              {value}
+            </p>
+          );
+        return (
+          <p
+            className={`${line.startsWith("   ") ? "pl-8 text-slate-600" : ""} leading-7`}
+            key={index}
+          >
+            {value}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 function QuizTake({
   quiz,
   onComplete,
@@ -2220,7 +2282,10 @@ function QuizTake({
     const correct = randomizedQuiz.questions.filter(
       (q, i) => (q.type ?? "choice") === "choice" && answers[i] === q.correct,
     ).length;
-    const score = Math.round((correct / randomizedQuiz.questions.length) * 100);
+    const choiceTotal = randomizedQuiz.questions.filter(
+      (question) => (question.type ?? "choice") === "choice",
+    ).length;
+    const score = choiceTotal ? Math.round((correct / choiceTotal) * 100) : 0;
     const hasEssay = randomizedQuiz.questions.some(
       (question) => question.type === "essay",
     );
@@ -2231,7 +2296,7 @@ function QuizTake({
       date: new Date().toISOString(),
       score,
       correct,
-      total: randomizedQuiz.questions.length,
+      total: choiceTotal,
       timeUsed: Math.max(1, Math.ceil((quiz.timeLimit * 60 - seconds) / 60)),
       answers,
       questionOrder: presentation.questionOrder,
@@ -2408,9 +2473,15 @@ function QuizTake({
               Flag for review
             </button>
           </div>
-          <h2 className="mt-7 max-w-3xl text-2xl font-semibold leading-9">
-            {q.text}
-          </h2>
+          {(q.type ?? "choice") === "essay" ? (
+            <div className="mt-7 max-w-4xl rounded-2xl border border-slate-200 bg-white p-5 md:p-8">
+              <EssayPrompt text={q.text} />
+            </div>
+          ) : (
+            <h2 className="mt-7 max-w-3xl text-2xl font-semibold leading-9">
+              {q.text}
+            </h2>
+          )}
           {(q.type ?? "choice") === "choice" ? (
             <div className="mt-8 grid gap-3">
               {q.options.map((o, i) => (
@@ -2662,9 +2733,15 @@ function ResultDetail({
                 const ok = a === q.correct;
                 return (
                   <div key={q.id} className="border-b border-slate-100 pb-5">
-                    <p className="font-semibold">
-                      {i + 1}. {q.text}
-                    </p>
+                    {(q.type ?? "choice") === "essay" ? (
+                      <div className="rounded-xl border border-slate-200 p-5">
+                        <EssayPrompt text={q.text} numbered={i + 1} />
+                      </div>
+                    ) : (
+                      <p className="font-semibold">
+                        {i + 1}. {q.text}
+                      </p>
+                    )}
                     {(q.type ?? "choice") === "essay" ? (
                       <>
                         <div className="mt-3 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-7 text-slate-700">
