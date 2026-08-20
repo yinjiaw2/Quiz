@@ -373,7 +373,7 @@ const redbridgeTrainingChoices: Array<[string, string[], number]> = [
   ],
 ];
 
-const stateManagerEssay = `州经理选拔策论题
+export const stateManagerEssay = `州经理选拔策论题
 
 题目
 《如何在90天内建立一个相互制衡、协同作战且不依赖个人的州级运营单元？》

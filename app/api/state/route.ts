@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { ensureSchema } from "../../../lib/db";
 import { readSession } from "../../../lib/auth";
-import { learners, seedQuestionBanks, seedQuizzes } from "../../data";
+import {
+  learners,
+  seedQuestionBanks,
+  seedQuizzes,
+  stateManagerEssay,
+} from "../../data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,6 +14,7 @@ export const dynamic = "force-dynamic";
 const retiredDemoQuizIds = new Set(["product-03", "privacy-101", "conduct"]);
 const currentDemoQuizIds = new Set(seedQuizzes.map((quiz) => quiz.id));
 const attemptsResetVersion = "2026-08-20-clear-all-attempts";
+const essayFormatVersion = "2026-08-20-word-exact-paragraphs-v1";
 
 export async function GET() {
   try {
@@ -34,6 +40,32 @@ export async function GET() {
     const data = rows[0].data;
     const shouldInitializeQuestionBanks = !Array.isArray(data.questionBanks);
     if (shouldInitializeQuestionBanks) data.questionBanks = seedQuestionBanks;
+    const shouldUpdateEssayFormat =
+      data.essayFormatVersion !== essayFormatVersion;
+    if (shouldUpdateEssayFormat) {
+      const isStateManagerEssay = (question: any) =>
+        question?.type === "essay" &&
+        String(question.text || "").includes(
+          "如何在90天内建立一个相互制衡、协同作战且不依赖个人的州级运营单元",
+        );
+      data.questionBanks = (data.questionBanks || []).map((bank: any) => ({
+        ...bank,
+        questions: (bank.questions || []).map((question: any) =>
+          isStateManagerEssay(question)
+            ? { ...question, text: stateManagerEssay, wordLimit: 1000 }
+            : question,
+        ),
+      }));
+      data.quizzes = (data.quizzes || []).map((quiz: any) => ({
+        ...quiz,
+        questions: (quiz.questions || []).map((question: any) =>
+          isStateManagerEssay(question)
+            ? { ...question, text: stateManagerEssay, wordLimit: 1000 }
+            : question,
+        ),
+      }));
+      data.essayFormatVersion = essayFormatVersion;
+    }
     const shouldResetAttempts =
       data.attemptsResetVersion !== attemptsResetVersion;
     if (shouldResetAttempts) {
@@ -77,6 +109,7 @@ export async function GET() {
       shouldReplaceRetiredDemos ||
       shouldResetAttempts ||
       shouldInitializeQuestionBanks ||
+      shouldUpdateEssayFormat ||
       existing.length !== originalLearners.length
     ) {
       data.learnerRecords = learnerRecords;
