@@ -1962,6 +1962,21 @@ function ResultDetail({
     (quiz.answerRelease === "deadline" &&
       new Date().getTime() >= new Date(quiz.deadline).getTime());
   const reviewQuestions = attempt.questionSnapshot || quiz.questions;
+  const choiceQuestions = reviewQuestions
+    .map((question, index) => ({ question, index }))
+    .filter(({ question }) => (question.type ?? "choice") === "choice");
+  const choiceCorrect = choiceQuestions.filter(
+    ({ question, index }) => attempt.answers[index] === question.correct,
+  ).length;
+  const choiceScore = choiceQuestions.length
+    ? Math.round((choiceCorrect / choiceQuestions.length) * 100)
+    : 0;
+  const choicePassed = choiceScore >= quiz.passingScore;
+  const visibleStatus = admin
+    ? attempt.status
+    : choicePassed
+      ? "Passed"
+      : "Failed";
   return (
     <>
       <button
@@ -1974,29 +1989,37 @@ function ResultDetail({
       <div className="mx-auto max-w-4xl">
         <section className="card overflow-hidden">
           <div
-            className={`p-8 text-center ${attempt.status === "Passed" ? "bg-[#edf7f1]" : attempt.status === "Pending" ? "bg-amber-50" : "bg-rose-50"}`}
+            className={`p-8 text-center ${visibleStatus === "Passed" ? "bg-[#edf7f1]" : visibleStatus === "Pending" ? "bg-amber-50" : "bg-rose-50"}`}
           >
             <div
-              className={`mx-auto grid h-16 w-16 place-items-center rounded-full bg-white ${attempt.status === "Passed" ? "text-brand" : attempt.status === "Pending" ? "text-amber-600" : "text-rose-600"}`}
+              className={`mx-auto grid h-16 w-16 place-items-center rounded-full bg-white ${visibleStatus === "Passed" ? "text-brand" : visibleStatus === "Pending" ? "text-amber-600" : "text-rose-600"}`}
             >
-              {attempt.status === "Passed" ? (
+              {visibleStatus === "Passed" ? (
                 <Trophy size={30} />
-              ) : attempt.status === "Pending" ? (
+              ) : visibleStatus === "Pending" ? (
                 <Clock3 size={30} />
               ) : (
                 <AlertTriangle size={30} />
               )}
             </div>
             <p className="mt-4 text-sm font-bold tracking-widest">
-              {statusText(attempt.status)}
+              {admin
+                ? statusText(attempt.status)
+                : `选择题${choicePassed ? "合格" : "不合格"}`}
             </p>
             <h1 className="mt-2 text-5xl font-bold">
-              {attempt.status === "Pending" ? "—" : `${attempt.score}%`}
+              {admin
+                ? attempt.status === "Pending"
+                  ? "—"
+                  : `${attempt.score}%`
+                : `${choiceScore}%`}
             </h1>
             <p className="mt-2 text-slate-600">
-              {attempt.status === "Pending"
-                ? `策论题评分完成后生成最终成绩 · ${quiz.title}`
-                : `答对 ${attempt.correct} / ${attempt.total} 题 · ${quiz.title}`}
+              {admin
+                ? attempt.status === "Pending"
+                  ? `策论题评分完成后生成最终成绩 · ${quiz.title}`
+                  : `答对 ${attempt.correct} / ${attempt.total} 题 · ${quiz.title}`
+                : `选择题答对 ${choiceCorrect} / ${choiceQuestions.length} 题 · ${quiz.title}`}
             </p>
           </div>
           <div className="grid grid-cols-3 divide-x divide-slate-100 p-6 text-center">
@@ -2042,7 +2065,7 @@ function ResultDetail({
                           回答字数：
                           {typeof a === "string" ? a.trim().length : 0}
                         </p>
-                        {admin && onGrade ? (
+                        {admin && onGrade && (
                           <div className="mt-4">
                             <label className="label">批改意见</label>
                             <textarea
@@ -2060,51 +2083,48 @@ function ResultDetail({
                               点击下面的评分按钮时，评分和批改意见会一起保存到后端。
                             </p>
                           </div>
-                        ) : (
-                          <div className="mt-3 rounded-xl bg-blue-50 p-3 text-sm text-blue-800">
-                            <span className="font-bold">批改意见：</span>
-                            {attempt.essayComments?.[i] || "暂无批改意见"}
+                        )}
+                        {admin && (
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-slate-600">
+                              管理员评分：
+                            </span>
+                            {admin && onGrade ? (
+                              <>
+                                <button
+                                  className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Passed" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+                                  onClick={() =>
+                                    void onGrade(
+                                      i,
+                                      "Passed",
+                                      essayComments[i] || "",
+                                    )
+                                  }
+                                >
+                                  合格
+                                </button>
+                                <button
+                                  className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Failed" ? "bg-rose-600 text-white" : "bg-rose-50 text-rose-700 hover:bg-rose-100"}`}
+                                  onClick={() =>
+                                    void onGrade(
+                                      i,
+                                      "Failed",
+                                      essayComments[i] || "",
+                                    )
+                                  }
+                                >
+                                  不合格
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-sm font-bold text-amber-700">
+                                {attempt.essayGrades?.[i]
+                                  ? statusText(attempt.essayGrades[i])
+                                  : "待评分"}
+                              </span>
+                            )}
                           </div>
                         )}
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-semibold text-slate-600">
-                            管理员评分：
-                          </span>
-                          {admin && onGrade ? (
-                            <>
-                              <button
-                                className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Passed" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
-                                onClick={() =>
-                                  void onGrade(
-                                    i,
-                                    "Passed",
-                                    essayComments[i] || "",
-                                  )
-                                }
-                              >
-                                合格
-                              </button>
-                              <button
-                                className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Failed" ? "bg-rose-600 text-white" : "bg-rose-50 text-rose-700 hover:bg-rose-100"}`}
-                                onClick={() =>
-                                  void onGrade(
-                                    i,
-                                    "Failed",
-                                    essayComments[i] || "",
-                                  )
-                                }
-                              >
-                                不合格
-                              </button>
-                            </>
-                          ) : (
-                            <span className="text-sm font-bold text-amber-700">
-                              {attempt.essayGrades?.[i]
-                                ? statusText(attempt.essayGrades[i])
-                                : "待评分"}
-                            </span>
-                          )}
-                        </div>
                       </>
                     ) : (
                       <>
@@ -2175,8 +2195,10 @@ export default function App() {
           ]);
         let s: any = null;
         let savedAttempts: Attempt[] = [];
+        let attemptsLoadedFromBackend = false;
         if (stateResponse.ok) s = await stateResponse.json();
         if (attemptsResponse.ok) {
+          attemptsLoadedFromBackend = true;
           const remoteAttempts: Attempt[] = await attemptsResponse.json();
           savedAttempts = remoteAttempts;
         }
@@ -2191,7 +2213,8 @@ export default function App() {
             resultsReleased: q.resultsReleased ?? false,
           })),
         );
-        if (!savedAttempts.length) savedAttempts = s.attempts || seedAttempts;
+        if (!attemptsLoadedFromBackend && !savedAttempts.length)
+          savedAttempts = s.attempts || seedAttempts;
         setAttempts(
           savedAttempts.map((a) => {
             const demo = seedAttempts.find((d) => d.id === a.id);
@@ -2490,8 +2513,26 @@ export default function App() {
               return;
             }
           } catch {}
-          setAttempts([a, ...attempts]);
-          setSelected(a);
+          const choiceQuestions = active.questions
+            .map((question, index) => ({ question, index }))
+            .filter(({ question }) => (question.type ?? "choice") === "choice");
+          const choiceCorrect = choiceQuestions.filter(
+            ({ question, index }) => a.answers[index] === question.correct,
+          ).length;
+          const choiceScore = choiceQuestions.length
+            ? Math.round((choiceCorrect / choiceQuestions.length) * 100)
+            : 0;
+          const learnerAttempt: Attempt = {
+            ...a,
+            questionSnapshot: active.questions,
+            passingScoreSnapshot: active.passingScore,
+            correct: choiceCorrect,
+            total: choiceQuestions.length,
+            score: choiceScore,
+            status: choiceScore >= active.passingScore ? "Passed" : "Failed",
+          };
+          setAttempts([learnerAttempt, ...attempts]);
+          setSelected(learnerAttempt);
           setResultBack("results");
           setView("resultDetail");
         }}
@@ -2685,6 +2726,8 @@ export default function App() {
         logout={() => {
           void fetch("/api/auth/logout", { method: "POST" });
           activeLearnerName = "";
+          setAttempts([]);
+          setSelected(undefined);
           setRole(null);
           setView("dashboard");
         }}

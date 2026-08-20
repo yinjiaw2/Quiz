@@ -16,7 +16,39 @@ export async function GET() {
       session.role === "admin"
         ? await sql`SELECT data FROM redbridge_attempts ORDER BY created_at DESC`
         : await sql`SELECT data FROM redbridge_attempts WHERE learner = ${session.name} ORDER BY created_at DESC`;
-    return NextResponse.json(rows.map((row) => row.data));
+    if (session.role === "admin")
+      return NextResponse.json(rows.map((row) => row.data));
+
+    const stateRows =
+      await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
+    const quizzes = stateRows[0]?.data?.quizzes || seedQuizzes;
+    const safeAttempts = rows.map((row) => {
+      const stored = row.data;
+      const quiz = quizzes.find((item: any) => item.id === stored.quizId);
+      const questions = stored.questionSnapshot || quiz?.questions || [];
+      const choiceQuestions = questions
+        .map((question: any, index: number) => ({ question, index }))
+        .filter(
+          ({ question }: any) => (question.type || "choice") === "choice",
+        );
+      const correct = choiceQuestions.filter(
+        ({ question, index }: any) =>
+          stored.answers?.[index] === question.correct,
+      ).length;
+      const total = choiceQuestions.length;
+      const score = total ? Math.round((correct / total) * 100) : 0;
+      const passingScore =
+        stored.passingScoreSnapshot ?? quiz?.passingScore ?? 0;
+      const { essayGrades, essayComments, ...safe } = stored;
+      return {
+        ...safe,
+        correct,
+        total,
+        score,
+        status: score >= passingScore ? "Passed" : "Failed",
+      };
+    });
+    return NextResponse.json(safeAttempts);
   } catch (error) {
     return NextResponse.json({ error: String(error) }, { status: 503 });
   }
