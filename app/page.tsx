@@ -2004,7 +2004,7 @@ function ResultDetail({
   admin?: boolean;
   onGrade?: (
     questionIndex: number,
-    grade: "Passed" | "Failed",
+    grade: "Passed" | "Failed" | undefined,
     comment: string,
   ) => Promise<void>;
 }) {
@@ -2024,6 +2024,10 @@ function ResultDetail({
   const choiceQuestions = reviewQuestions
     .map((question, index) => ({ question, index }))
     .filter(({ question }) => (question.type ?? "choice") === "choice");
+  const essayQuestions = reviewQuestions
+    .map((question, index) => ({ question, index }))
+    .filter(({ question }) => question.type === "essay");
+  const orderedReviewQuestions = [...choiceQuestions, ...essayQuestions];
   const choiceCorrect = choiceQuestions.filter(
     ({ question, index }) => attempt.answers[index] === question.correct,
   ).length;
@@ -2107,102 +2111,130 @@ function ResultDetail({
               </p>
             )}
             <div className="mt-5 space-y-5">
-              {reviewQuestions.map((q, i) => {
-                const a = attempt.answers[i];
-                const ok = a === q.correct;
-                return (
-                  <div key={q.id} className="border-b border-slate-100 pb-5">
-                    <p className="font-semibold">
-                      {i + 1}. {q.text}
-                    </p>
-                    {(q.type ?? "choice") === "essay" ? (
-                      <>
-                        <div className="mt-3 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-7 text-slate-700">
-                          {typeof a === "string" && a.trim() ? a : "学员未作答"}
-                        </div>
-                        <p className="mt-2 text-xs text-slate-500">
-                          回答字数：
-                          {typeof a === "string" ? a.trim().length : 0}
-                        </p>
-                        {admin && onGrade && (
-                          <div className="mt-4">
-                            <label className="label">批改意见</label>
-                            <textarea
-                              className="input min-h-24"
-                              value={essayComments[i] || ""}
-                              onChange={(event) =>
-                                setEssayComments({
-                                  ...essayComments,
-                                  [i]: event.target.value,
-                                })
-                              }
-                              placeholder="请输入对这道策论题的批改意见（可选）"
-                            />
-                            <p className="mt-1 text-xs text-slate-500">
-                              点击下面的评分按钮时，评分和批改意见会一起保存到后端。
-                            </p>
-                          </div>
+              {orderedReviewQuestions.map(
+                ({ question: q, index: i }, position) => {
+                  const a = attempt.answers[i];
+                  const ok = a === q.correct;
+                  return (
+                    <div key={q.id} className="border-b border-slate-100 pb-5">
+                      {position === 0 && choiceQuestions.length > 0 && (
+                        <h3 className="mb-4 text-lg font-bold text-brand">
+                          选择题
+                        </h3>
+                      )}
+                      {position === choiceQuestions.length &&
+                        essayQuestions.length > 0 && (
+                          <h3 className="mb-4 mt-8 border-t border-slate-200 pt-6 text-lg font-bold text-brand">
+                            策论题
+                          </h3>
                         )}
-                        {admin && (
-                          <div className="mt-3 flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-600">
-                              管理员评分：
-                            </span>
-                            {admin && onGrade ? (
-                              <>
-                                <button
-                                  className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Passed" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
-                                  onClick={() =>
-                                    void onGrade(
-                                      i,
-                                      "Passed",
-                                      essayComments[i] || "",
-                                    )
-                                  }
-                                >
-                                  合格
-                                </button>
-                                <button
-                                  className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Failed" ? "bg-rose-600 text-white" : "bg-rose-50 text-rose-700 hover:bg-rose-100"}`}
-                                  onClick={() =>
-                                    void onGrade(
-                                      i,
-                                      "Failed",
-                                      essayComments[i] || "",
-                                    )
-                                  }
-                                >
-                                  不合格
-                                </button>
-                              </>
-                            ) : (
-                              <span className="text-sm font-bold text-amber-700">
-                                {attempt.essayGrades?.[i]
-                                  ? statusText(attempt.essayGrades[i])
-                                  : "待评分"}
-                              </span>
-                            )}
+                      <p className="font-semibold">
+                        {i + 1}. {q.text}
+                      </p>
+                      {(q.type ?? "choice") === "essay" ? (
+                        <>
+                          <div className="mt-3 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-7 text-slate-700">
+                            {typeof a === "string" && a.trim()
+                              ? a
+                              : "学员未作答"}
                           </div>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <p
-                          className={`mt-2 text-sm ${ok ? "text-emerald-700" : "text-rose-600"}`}
-                        >
-                          学员答案：
-                          {typeof a === "number" ? q.options[a] : "未记录"}
-                        </p>
-                        {!ok && (
-                          <p className="mt-1 text-sm text-emerald-700">
-                            正确答案：{q.options[q.correct]}
+                          <p className="mt-2 text-xs text-slate-500">
+                            回答字数：
+                            {typeof a === "string" ? a.trim().length : 0}
                           </p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+                          {admin && onGrade && (
+                            <div className="mt-4">
+                              <label className="label">批改意见</label>
+                              <textarea
+                                className="input min-h-24"
+                                value={essayComments[i] || ""}
+                                onChange={(event) =>
+                                  setEssayComments({
+                                    ...essayComments,
+                                    [i]: event.target.value,
+                                  })
+                                }
+                                placeholder="请输入对这道策论题的批改意见（可选）"
+                              />
+                              <p className="mt-1 text-xs text-slate-500">
+                                可以单独保存意见；点击评分按钮时也会同时保存。
+                              </p>
+                              <button
+                                className="btn-secondary mt-3"
+                                onClick={() =>
+                                  void onGrade(
+                                    i,
+                                    undefined,
+                                    essayComments[i] || "",
+                                  )
+                                }
+                              >
+                                <Check size={16} />
+                                保存批改意见
+                              </button>
+                            </div>
+                          )}
+                          {admin && (
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-semibold text-slate-600">
+                                管理员评分：
+                              </span>
+                              {admin && onGrade ? (
+                                <>
+                                  <button
+                                    className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Passed" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+                                    onClick={() =>
+                                      void onGrade(
+                                        i,
+                                        "Passed",
+                                        essayComments[i] || "",
+                                      )
+                                    }
+                                  >
+                                    合格
+                                  </button>
+                                  <button
+                                    className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Failed" ? "bg-rose-600 text-white" : "bg-rose-50 text-rose-700 hover:bg-rose-100"}`}
+                                    onClick={() =>
+                                      void onGrade(
+                                        i,
+                                        "Failed",
+                                        essayComments[i] || "",
+                                      )
+                                    }
+                                  >
+                                    不合格
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-sm font-bold text-amber-700">
+                                  {attempt.essayGrades?.[i]
+                                    ? statusText(attempt.essayGrades[i])
+                                    : "待评分"}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <p
+                            className={`mt-2 text-sm ${ok ? "text-emerald-700" : "text-rose-600"}`}
+                          >
+                            学员答案：
+                            {typeof a === "number" ? q.options[a] : "未记录"}
+                          </p>
+                          {!ok && (
+                            <p className="mt-1 text-sm text-emerald-700">
+                              正确答案：{q.options[q.correct]}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                },
+              )}
             </div>
           </section>
         ) : (
@@ -2239,7 +2271,14 @@ export default function App() {
   const [edit, setEdit] = useState<Quiz>();
   const [selected, setSelected] = useState<Attempt>();
   const [selectedLearner, setSelectedLearner] = useState<LearnerRecord>();
+  const [saveToast, setSaveToast] = useState(false);
+  const saveToastTimer = useRef<number | undefined>(undefined);
   const hydrated = useRef(false);
+  const showSaveSuccess = () => {
+    setSaveToast(true);
+    if (saveToastTimer.current) window.clearTimeout(saveToastTimer.current);
+    saveToastTimer.current = window.setTimeout(() => setSaveToast(false), 2500);
+  };
   useEffect(() => {
     const load = async () => {
       try {
@@ -2373,18 +2412,22 @@ export default function App() {
   const updateQuizzesAndSync = (next: Quiz[]) => {
     const previous = quizzes;
     setQuizzes(next);
-    void saveSharedState(next, learnerRecords, announcement).catch((error) => {
-      setQuizzes(previous);
-      alert(`${error.message}，本次考核修改已撤销。`);
-    });
+    void saveSharedState(next, learnerRecords, announcement)
+      .then(showSaveSuccess)
+      .catch((error) => {
+        setQuizzes(previous);
+        alert(`${error.message}，本次考核修改已撤销。`);
+      });
   };
   const updateLearnersAndSync = (next: LearnerRecord[]) => {
     const previous = learnerRecords;
     setLearnerRecords(next);
-    void saveSharedState(quizzes, next, announcement).catch((error) => {
-      setLearnerRecords(previous);
-      alert(`${error.message}，本次部门修改已撤销。`);
-    });
+    void saveSharedState(quizzes, next, announcement)
+      .then(showSaveSuccess)
+      .catch((error) => {
+        setLearnerRecords(previous);
+        alert(`${error.message}，本次部门修改已撤销。`);
+      });
   };
   const shouldShowCurrentAnnouncement = () =>
     Boolean(
@@ -2480,7 +2523,7 @@ export default function App() {
   };
   const gradeEssay = async (
     questionIndex: number,
-    grade: "Passed" | "Failed",
+    grade: "Passed" | "Failed" | undefined,
     comment: string,
   ) => {
     if (!selected) return;
@@ -2507,6 +2550,7 @@ export default function App() {
           attempt.id === updated.id ? updated : attempt,
         ),
       );
+      showSaveSuccess();
     } catch {
       alert("无法连接后端，评分保存失败");
     }
@@ -2777,6 +2821,12 @@ export default function App() {
     );
   return (
     <>
+      {saveToast && (
+        <div className="fixed right-5 top-5 z-[100] flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-xl">
+          <CheckCircle2 size={18} />
+          保存成功
+        </div>
+      )}
       <Shell
         role={role}
         view={view}
@@ -2846,6 +2896,7 @@ export default function App() {
                     setAnnouncement(nextAnnouncement);
                     setAnnouncementPersistent(announcementPersistentDraft);
                     setAnnounceEditor(false);
+                    showSaveSuccess();
                   } catch (error) {
                     alert(
                       error instanceof Error ? error.message : "公告发布失败",

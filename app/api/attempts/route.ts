@@ -156,7 +156,7 @@ export async function PATCH(request: Request) {
     if (
       !attemptId ||
       !Number.isInteger(questionIndex) ||
-      !["Passed", "Failed"].includes(grade)
+      (grade !== undefined && !["Passed", "Failed"].includes(grade))
     )
       return NextResponse.json({ error: "评分信息无效" }, { status: 400 });
 
@@ -177,10 +177,8 @@ export async function PATCH(request: Request) {
     if (!question || question.type !== "essay")
       return NextResponse.json({ error: "该题不是策论题" }, { status: 400 });
 
-    attempt.essayGrades = {
-      ...(attempt.essayGrades || {}),
-      [questionIndex]: grade,
-    };
+    attempt.essayGrades = attempt.essayGrades || {};
+    if (grade !== undefined) attempt.essayGrades[questionIndex] = grade;
     attempt.essayComments = {
       ...(attempt.essayComments || {}),
       [questionIndex]: String(comment).trim(),
