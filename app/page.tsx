@@ -2282,6 +2282,7 @@ function QuizTake({
   const [seconds, setSeconds] = useState(randomizedQuiz.timeLimit * 60);
   const [submitOpen, setSubmitOpen] = useState(false);
   const [violations, setViolations] = useState({ tab: 0, fs: 0 });
+  const finishingRef = useRef(false);
   const answered = randomizedQuiz.questions.filter((question, index) => {
     const answer = answers[index];
     return (question.type ?? "choice") === "essay"
@@ -2289,6 +2290,8 @@ function QuizTake({
       : typeof answer === "number";
   }).length;
   const finish = () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
     const correct = randomizedQuiz.questions.filter(
       (q, i) => (q.type ?? "choice") === "choice" && answers[i] === q.correct,
     ).length;
@@ -2299,7 +2302,7 @@ function QuizTake({
     const hasEssay = randomizedQuiz.questions.some(
       (question) => question.type === "essay",
     );
-    onComplete({
+    const completedAttempt: Attempt = {
       id: crypto.randomUUID(),
       quizId: quiz.id,
       learner: activeLearnerName || "未知学员",
@@ -2319,7 +2322,13 @@ function QuizTake({
           : "Failed",
       tabSwitches: violations.tab,
       fullscreenExits: violations.fs,
-    });
+    };
+    const complete = () => onComplete(completedAttempt);
+    if (document.fullscreenElement) {
+      document.exitFullscreen().then(complete).catch(complete);
+    } else {
+      complete();
+    }
   };
   useEffect(() => {
     const t = setInterval(
