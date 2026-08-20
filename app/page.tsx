@@ -2250,7 +2250,17 @@ function QuizTake({
       }
       return next;
     };
-    const questionOrder = shuffle(quiz.questions.map((_, index) => index));
+    const choiceQuestionOrder = shuffle(
+      quiz.questions
+        .map((question, index) => ({ question, index }))
+        .filter(({ question }) => (question.type ?? "choice") === "choice")
+        .map(({ index }) => index),
+    );
+    const essayQuestionOrder = quiz.questions
+      .map((question, index) => ({ question, index }))
+      .filter(({ question }) => question.type === "essay")
+      .map(({ index }) => index);
+    const questionOrder = [...choiceQuestionOrder, ...essayQuestionOrder];
     const optionOrders: Record<number, number[]> = {};
     const questions = questionOrder.map((originalQuestionIndex, index) => {
       const question = quiz.questions[originalQuestionIndex];
@@ -2676,7 +2686,7 @@ function ResultDetail({
                 ? attempt.status === "Pending"
                   ? "—"
                   : `${attempt.score}%`
-                : "等待管理端处理"}
+                : "等待管理评分"}
             </h1>
             <p className="mt-2 text-slate-600">
               {admin
