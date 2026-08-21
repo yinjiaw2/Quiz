@@ -2988,7 +2988,7 @@ function ResultDetail({
                             {admin && onGrade ? (
                               <>
                                 <button
-                                  className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Excellent" ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700 hover:bg-amber-100"}`}
+                                  className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Excellent" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
                                   onClick={() =>
                                     void onGrade(
                                       i,
@@ -3001,7 +3001,7 @@ function ResultDetail({
                                   优秀
                                 </button>
                                 <button
-                                  className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Passed" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
+                                  className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Passed" ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700 hover:bg-amber-100"}`}
                                   onClick={() =>
                                     void onGrade(
                                       i,
