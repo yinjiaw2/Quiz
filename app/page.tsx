@@ -3093,6 +3093,9 @@ function ResultDetail({
 }
 
 export default function App() {
+  const [browserCompatibility, setBrowserCompatibility] = useState<
+    "checking" | "supported" | "blocked"
+  >("checking");
   const [role, setRole] = useState<Role | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [learnerRecords, setLearnerRecords] =
@@ -3116,12 +3119,28 @@ export default function App() {
   const [saveToast, setSaveToast] = useState(false);
   const saveToastTimer = useRef<number | undefined>(undefined);
   const hydrated = useRef(false);
+  useEffect(() => {
+    const isWeChat = /MicroMessenger/i.test(navigator.userAgent);
+    let hasLocalStorage = false;
+    try {
+      const testKey = "redbridge-browser-test";
+      localStorage.setItem(testKey, "1");
+      localStorage.removeItem(testKey);
+      hasLocalStorage = true;
+    } catch {
+      hasLocalStorage = false;
+    }
+    setBrowserCompatibility(
+      !isWeChat && hasLocalStorage ? "supported" : "blocked",
+    );
+  }, []);
   const showSaveSuccess = () => {
     setSaveToast(true);
     if (saveToastTimer.current) window.clearTimeout(saveToastTimer.current);
     saveToastTimer.current = window.setTimeout(() => setSaveToast(false), 2500);
   };
   useEffect(() => {
+    if (browserCompatibility !== "supported") return;
     const load = async () => {
       try {
         const [stateResponse, attemptsResponse, sessionResponse] =
@@ -3211,7 +3230,7 @@ export default function App() {
       }
     };
     load();
-  }, []);
+  }, [browserCompatibility]);
   useEffect(() => {
     if (!hydrated.current) return;
     const state = {
@@ -3422,6 +3441,51 @@ export default function App() {
       alert("无法连接后端，评分保存失败");
     }
   };
+  if (browserCompatibility === "checking")
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#eef4ef] p-5">
+        <div className="text-sm font-semibold text-slate-500">
+          正在检查浏览器环境…
+        </div>
+      </main>
+    );
+  if (browserCompatibility === "blocked")
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#eef4ef] p-5">
+        <section className="w-full max-w-lg rounded-[28px] bg-white p-8 text-center shadow-xl md:p-10">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-amber-50 text-amber-600">
+            <AlertTriangle size={30} />
+          </div>
+          <h1 className="mt-6 text-2xl font-bold text-slate-900">
+            请使用系统浏览器打开
+          </h1>
+          <p className="mt-3 text-sm leading-7 text-slate-600">
+            Redbridge
+            实习生考核需要使用浏览器本地存储来保护登录及答题数据，微信内置浏览器不支持进入。
+          </p>
+          <div className="mt-5 rounded-2xl bg-slate-50 p-4 text-left text-sm leading-7 text-slate-600">
+            <p className="font-bold text-slate-800">打开方法</p>
+            <p>1. 点击微信右上角“…”</p>
+            <p>2. 选择“在浏览器打开”，或复制链接</p>
+            <p>3. 使用 Chrome、Safari、Edge 等浏览器访问</p>
+          </div>
+          <button
+            type="button"
+            className="btn-primary mt-6 w-full"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(window.location.href);
+                alert("链接已复制，请粘贴到 Chrome、Safari 或 Edge 打开");
+              } catch {
+                prompt("请复制以下链接到浏览器打开", window.location.href);
+              }
+            }}
+          >
+            复制网页链接
+          </button>
+        </section>
+      </main>
+    );
   if (!role)
     return (
       <Login
