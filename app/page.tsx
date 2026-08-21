@@ -3205,6 +3205,9 @@ export default function App() {
   const [announceEditor, setAnnounceEditor] = useState(false);
   const [showAnnouncement, setShowAnnouncement] = useState(false);
   const [view, setView] = useState<View>("dashboard");
+  const [resultAccountView, setResultAccountView] = useState<
+    "regular" | "test"
+  >("regular");
   const [resultBack, setResultBack] = useState<View>("results");
   const [quizzes, setQuizzes] = useState(seedQuizzes);
   const [questionBanks, setQuestionBanks] = useState(seedQuestionBanks);
@@ -3763,10 +3766,23 @@ export default function App() {
       />
     );
   } else if (view === "results") {
+    const testAccountNames = new Set(
+      learnerRecords
+        .filter((learner) => learner.testAccount)
+        .map((learner) => learner.name),
+    );
+    const regularAttempts = attempts.filter(
+      (attempt) => !testAccountNames.has(attempt.learner),
+    );
+    const testAttempts = attempts.filter((attempt) =>
+      testAccountNames.has(attempt.learner),
+    );
     const rows =
       role === "learner"
         ? attempts.filter((a) => a.learner === activeLearnerName)
-        : attempts;
+        : resultAccountView === "test"
+          ? testAttempts
+          : regularAttempts;
     content = (
       <>
         <PageTitle
@@ -3777,6 +3793,24 @@ export default function App() {
               : "查看成绩、完成情况和专注模式事件。"
           }
         />
+        {role === "admin" && (
+          <div className="mb-5 inline-flex rounded-2xl bg-slate-100 p-1.5">
+            <button
+              type="button"
+              className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${resultAccountView === "regular" ? "bg-white text-brand shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+              onClick={() => setResultAccountView("regular")}
+            >
+              正式学员（{regularAttempts.length}）
+            </button>
+            <button
+              type="button"
+              className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${resultAccountView === "test" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+              onClick={() => setResultAccountView("test")}
+            >
+              测试账号（{testAttempts.length}）
+            </button>
+          </div>
+        )}
         <div className="card overflow-hidden">
           <ResultTable
             attempts={rows}
