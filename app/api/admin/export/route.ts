@@ -96,8 +96,10 @@ export async function GET(request: Request) {
         : quizTitle;
       const choiceQuestions = questions
         .map((question: any, index: number) => ({ question, index }))
+        .filter(({ question }: any) => (question.type || "choice") === "choice")
         .filter(
-          ({ question }: any) => (question.type || "choice") === "choice",
+          ({ question, index }: any) =>
+            attempt.answers?.[index] !== question.correct,
         );
       const essayQuestions = questions
         .map((question: any, index: number) => ({ question, index }))
@@ -159,7 +161,7 @@ export async function GET(request: Request) {
               <span><strong>分数：</strong>${attempt.status === "Pending" ? "待评分" : `${escapeHtml(attempt.score)}%`}</span>
             </div>
           </header>
-          ${choiceQuestions.length ? `<h2>选择题</h2>${choiceQuestions.map(renderQuestion).join("")}` : ""}
+          ${choiceQuestions.length ? `<h2>错误选择题</h2>${choiceQuestions.map(renderQuestion).join("")}` : ""}
           ${essayQuestions.length ? `<h2>策论题</h2>${essayQuestions.map(renderQuestion).join("")}` : ""}
           ${questions.length ? "" : '<p class="empty">此历史记录没有可用的题目快照。</p>'}
           <footer>Redbridge 实习生考核 · ${escapeHtml(testTitle)}</footer>
