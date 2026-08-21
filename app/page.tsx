@@ -53,7 +53,7 @@ type View =
   | "take"
   | "resultDetail";
 type Account = { name: string; username: string; password: string };
-type LearnerRecord = (typeof learners)[number];
+type LearnerRecord = (typeof learners)[number] & { testAccount?: boolean };
 let activeLearnerName = "";
 const fmtDate = (v: string) =>
   new Intl.DateTimeFormat("zh-CN", {
@@ -703,6 +703,14 @@ function LearnerManagement({
     setRecords(
       records.map((l) => (l.email === email ? { ...l, department } : l)),
     );
+  const toggleTestAccount = (email: string) =>
+    setRecords(
+      records.map((learner) =>
+        learner.email === email
+          ? { ...learner, testAccount: !learner.testAccount }
+          : learner,
+      ),
+    );
   return (
     <>
       <PageTitle
@@ -734,7 +742,20 @@ function LearnerManagement({
                     onClick={() => open(l)}
                   >
                     <td className="px-5 py-4">
-                      <p className="font-semibold">{l.name}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold">{l.name}</p>
+                        <button
+                          type="button"
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${l.testAccount ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-500 hover:bg-violet-50 hover:text-violet-700"}`}
+                          title="点击切换测试账号标签"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleTestAccount(l.email);
+                          }}
+                        >
+                          {l.testAccount ? "测试账号" : "设为测试账号"}
+                        </button>
+                      </div>
                       <p className="text-xs text-slate-500">{l.email}</p>
                     </td>
                     <td
@@ -3316,6 +3337,7 @@ export default function App() {
             email: user.username,
             department: existing?.department || "运营",
             completed: existing?.completed || 0,
+            testAccount: existing?.testAccount || false,
           };
         }),
       ]);
@@ -3423,6 +3445,7 @@ export default function App() {
               email: a.username,
               department: "运营",
               completed: 0,
+              testAccount: false,
             },
           ]);
           setRole("learner");

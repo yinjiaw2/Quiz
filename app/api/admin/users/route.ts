@@ -31,7 +31,7 @@ export async function DELETE(request: Request) {
   try {
     if (!(await requireAdmin()))
       return NextResponse.json({ error: "无权删除学员" }, { status: 403 });
-    const { username } = await request.json();
+    const { username, name = "" } = await request.json();
     if (!username)
       return NextResponse.json({ error: "缺少用户名" }, { status: 400 });
     const sql = await ensureSchema();
@@ -39,22 +39,32 @@ export async function DELETE(request: Request) {
       SELECT name FROM redbridge_users
       WHERE username = ${String(username).toLowerCase()}
     `;
-    if (!users.length)
-      return NextResponse.json({ error: "学员不存在" }, { status: 404 });
-    await sql`DELETE FROM redbridge_attempts WHERE learner = ${users[0].name}`;
-    const rows = await sql`
+    const storedName = users[0]?.name || "";
+    const requestedName = String(name).trim();
+    await sql`
+      DELETE FROM redbridge_attempts
+      WHERE learner = ${storedName} OR learner = ${requestedName}
+    `;
+    await sql`
+      DELETE FROM redbridge_attempt_drafts
+      WHERE username = ${String(username).toLowerCase()}
+         OR learner = ${storedName}
+         OR learner = ${requestedName}
+    `;
+    await sql`
       DELETE FROM redbridge_users
       WHERE username = ${String(username).toLowerCase()}
-      RETURNING username
     `;
-    if (!rows.length)
-      return NextResponse.json({ error: "学员不存在" }, { status: 404 });
     const stateRows =
       await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
     if (stateRows.length) {
       const data = stateRows[0].data;
       data.learnerRecords = (data.learnerRecords || []).filter(
-        (learner: any) => learner.email !== String(username).toLowerCase(),
+        (learner: any) =>
+          String(learner.email).toLowerCase() !==
+            String(username).toLowerCase() &&
+          learner.name !== storedName &&
+          learner.name !== requestedName,
       );
       await sql`
         UPDATE redbridge_state

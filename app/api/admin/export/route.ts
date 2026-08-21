@@ -60,6 +60,11 @@ export async function GET(request: Request) {
         ? await sql`SELECT data FROM redbridge_attempts WHERE learner = ${learner} ORDER BY created_at ASC`
         : await sql`SELECT data FROM redbridge_attempts WHERE quiz_id = ${quizId} ORDER BY learner ASC, created_at ASC`;
     const quizzes = stateRows[0]?.data?.quizzes || seedQuizzes;
+    const testAccountNames = new Set(
+      (stateRows[0]?.data?.learnerRecords || [])
+        .filter((record: any) => record.testAccount)
+        .map((record: any) => record.name),
+    );
     const quizMap = new Map(quizzes.map((quiz: any) => [quiz.id, quiz]));
     const attempts = attemptRows
       .map((row) => row.data)
@@ -175,7 +180,7 @@ export async function GET(request: Request) {
             <div class="brand">Redbridge 实习生考核</div>
             <h1>${escapeHtml(testTitle)}</h1>
             <div class="meta">
-              <span><strong>姓名：</strong>${escapeHtml(attempt.learner)}</span>
+              <span><strong>姓名：</strong>${escapeHtml(attempt.learner)}${testAccountNames.has(attempt.learner) ? '<strong class="test-account">（测试账号）</strong>' : ""}</span>
               ${dateLine}
               <span><strong>结果：</strong>${escapeHtml(statusText(attempt.status))}</span>
               <span><strong>评分：</strong>${attempt.status === "Pending" ? "待评分" : escapeHtml(statusText(attempt.status))}</span>
@@ -210,6 +215,7 @@ export async function GET(request: Request) {
         h1 { margin: 8px 0 10px; font-size: 23px; }
         h2 { margin: 22px 0 10px; padding: 8px 11px; border-left: 4px solid #2f6e55; background: #edf7f1; color: #245642; font-size: 16px; }
         .meta { display: flex; flex-wrap: wrap; gap: 7px 20px; color: #475569; font-size: 11px; }
+        .test-account { margin-left: 4px; color: #6d28d9; }
         .question { break-inside: avoid; margin: 0 0 11px; padding: 11px 12px; border: 1px solid #dbe4df; border-radius: 8px; font-size: 11px; line-height: 1.65; }
         .question h4 { margin: 0 0 7px; color: #0f172a; font-size: 12px; }
         .incorrect-number { display: inline-block; min-width: 22px; border-radius: 5px; padding: 1px 5px; background: #fee2e2; color: #b91c1c; font-weight: 800; }

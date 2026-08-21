@@ -96,6 +96,7 @@ export async function GET() {
           email: user.username,
           department: "运营",
           completed: 0,
+          testAccount: false,
         })),
     ];
     if (
