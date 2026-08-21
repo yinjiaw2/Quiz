@@ -118,7 +118,7 @@ export async function POST(request: Request) {
       (question: any, index: number) => {
         if (question.type !== "essay") return false;
         const wordLimit = Math.min(
-          1000,
+          10000,
           Math.max(1, Number(question.wordLimit) || 1000),
         );
         return String(answers[index] || "").length > wordLimit;
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
     );
     if (oversizedEssayIndex >= 0) {
       const wordLimit = Math.min(
-        1000,
+        10000,
         Math.max(
           1,
           Number(questionSnapshot[oversizedEssayIndex].wordLimit) || 1000,

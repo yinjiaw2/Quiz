@@ -1331,12 +1331,12 @@ function QuestionBankManagement({
                         className="input"
                         type="number"
                         min="1"
-                        max="1000"
+                        max="10000"
                         value={question.wordLimit || 1000}
                         onChange={(event) =>
                           updateQuestion(index, {
                             wordLimit: Math.min(
-                              1000,
+                              10000,
                               Math.max(1, +event.target.value),
                             ),
                           })
@@ -1488,7 +1488,7 @@ function Builder({
         options: [...item.options],
         wordLimit:
           item.type === "essay"
-            ? Math.min(1000, Math.max(1, item.wordLimit || 1000))
+            ? Math.min(10000, Math.max(1, item.wordLimit || 1000))
             : item.wordLimit,
       }));
     setQ({
@@ -1891,12 +1891,12 @@ function Builder({
                     className="input"
                     type="number"
                     min="1"
-                    max="1000"
+                    max="10000"
                     value={question.wordLimit || 1000}
                     onChange={(event) =>
                       uq({
                         wordLimit: Math.min(
-                          1000,
+                          10000,
                           Math.max(1, +event.target.value),
                         ),
                       })

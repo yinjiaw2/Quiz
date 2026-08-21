@@ -106,6 +106,7 @@ export async function GET(request: Request) {
       const renderQuestion = ({ question, index }: any) => {
         const answer = attempt.answers?.[index];
         const isEssay = question.type === "essay";
+        const incorrectChoice = !isEssay && answer !== question.correct;
         const essayTitle = isEssay
           ? String(question.text || "")
               .split("\n")
@@ -134,7 +135,7 @@ export async function GET(request: Request) {
             : "错误";
         return `
           <article class="question">
-            <h4>${index + 1}. ${escapeHtml(isEssay ? essayTitle : question.text)}</h4>
+            <h4><span class="${incorrectChoice ? "incorrect-number" : ""}">${index + 1}.</span> ${escapeHtml(isEssay ? essayTitle : question.text)}</h4>
             <div class="answer"><strong>学员答案：</strong>${escapeHtml(learnerAnswer)}</div>
             ${!isEssay ? `<div><strong>正确答案：</strong>${escapeHtml(correctAnswer)}</div>` : ""}
             <div><strong>${isEssay ? "管理员评分" : "答题结果"}：</strong>${escapeHtml(grade)}</div>
@@ -188,6 +189,7 @@ export async function GET(request: Request) {
         .meta { display: flex; flex-wrap: wrap; gap: 7px 20px; color: #475569; font-size: 11px; }
         .question { break-inside: avoid; margin: 0 0 11px; padding: 11px 12px; border: 1px solid #dbe4df; border-radius: 8px; font-size: 11px; line-height: 1.65; }
         .question h4 { margin: 0 0 7px; color: #0f172a; font-size: 12px; }
+        .incorrect-number { display: inline-block; min-width: 22px; border-radius: 5px; padding: 1px 5px; background: #fee2e2; color: #b91c1c; font-weight: 800; }
         .answer { white-space: pre-wrap; }
         .comment { margin-top: 5px; padding: 7px 9px; background: #f8fafc; white-space: pre-wrap; }
         footer { margin-top: 18px; border-top: 1px solid #dbe4df; padding-top: 8px; color: #94a3b8; font-size: 9px; text-align: center; }
