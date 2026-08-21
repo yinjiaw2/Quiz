@@ -47,7 +47,7 @@ export type Attempt = {
   optionOrders?: Record<number, number[]>;
   questionSnapshot?: Question[];
   passingScoreSnapshot?: number;
-  essayGrades?: Record<number, "Passed" | "Failed">;
+  essayGrades?: Record<number, "Excellent" | "Passed" | "Failed">;
   essayComments?: Record<number, string>;
   essayGraders?: Record<number, string>;
   status: "Passed" | "Failed" | "Pending";

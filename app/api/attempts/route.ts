@@ -198,7 +198,8 @@ export async function PATCH(request: Request) {
     if (
       !attemptId ||
       !Number.isInteger(questionIndex) ||
-      (grade !== undefined && !["Passed", "Failed"].includes(grade))
+      (grade !== undefined &&
+        !["Excellent", "Passed", "Failed"].includes(grade))
     )
       return NextResponse.json({ error: "评分信息无效" }, { status: 400 });
 

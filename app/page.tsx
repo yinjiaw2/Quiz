@@ -79,6 +79,7 @@ const badge = (s: string) =>
 const statusText = (s: string) =>
   ({
     Passed: "合格",
+    Excellent: "优秀",
     Failed: "不合格",
     Pending: "待管理员评分",
     Published: "已发布",
@@ -2778,7 +2779,7 @@ function ResultDetail({
   admin?: boolean;
   onGrade?: (
     questionIndex: number,
-    grade: "Passed" | "Failed" | undefined,
+    grade: "Excellent" | "Passed" | "Failed" | undefined,
     comment: string,
     grader: string,
   ) => Promise<void>;
@@ -2986,6 +2987,19 @@ function ResultDetail({
                             </span>
                             {admin && onGrade ? (
                               <>
+                                <button
+                                  className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Excellent" ? "bg-amber-500 text-white" : "bg-amber-50 text-amber-700 hover:bg-amber-100"}`}
+                                  onClick={() =>
+                                    void onGrade(
+                                      i,
+                                      "Excellent",
+                                      essayComments[i] || "",
+                                      essayGraders[i] || "",
+                                    )
+                                  }
+                                >
+                                  优秀
+                                </button>
                                 <button
                                   className={`rounded-lg px-3 py-2 text-sm font-bold ${attempt.essayGrades?.[i] === "Passed" ? "bg-emerald-600 text-white" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"}`}
                                   onClick={() =>
@@ -3352,7 +3366,7 @@ export default function App() {
   };
   const gradeEssay = async (
     questionIndex: number,
-    grade: "Passed" | "Failed" | undefined,
+    grade: "Excellent" | "Passed" | "Failed" | undefined,
     comment: string,
     grader: string,
   ) => {

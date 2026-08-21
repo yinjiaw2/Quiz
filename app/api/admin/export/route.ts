@@ -145,11 +145,13 @@ export async function GET(request: Request) {
           ? ""
           : question.options?.[question.correct] || "";
         const grade = isEssay
-          ? attempt.essayGrades?.[index] === "Passed"
-            ? "合格"
-            : attempt.essayGrades?.[index] === "Failed"
-              ? "不合格"
-              : "待评分"
+          ? attempt.essayGrades?.[index] === "Excellent"
+            ? "优秀"
+            : attempt.essayGrades?.[index] === "Passed"
+              ? "合格"
+              : attempt.essayGrades?.[index] === "Failed"
+                ? "不合格"
+                : "待评分"
           : answer === question.correct
             ? "正确"
             : "错误";
@@ -176,7 +178,8 @@ export async function GET(request: Request) {
               <span><strong>姓名：</strong>${escapeHtml(attempt.learner)}</span>
               ${dateLine}
               <span><strong>结果：</strong>${escapeHtml(statusText(attempt.status))}</span>
-              <span><strong>分数：</strong>${attempt.status === "Pending" ? "待评分" : `${escapeHtml(attempt.score)}%`}</span>
+              <span><strong>评分：</strong>${attempt.status === "Pending" ? "待评分" : escapeHtml(statusText(attempt.status))}</span>
+              <span><strong>违规次数：</strong>${escapeHtml((attempt.tabSwitches || 0) + (attempt.fullscreenExits || 0))}</span>
             </div>
           </header>
           ${choiceQuestions.length ? `<h2>错误选择题</h2>${choiceQuestions.map(renderQuestion).join("")}` : ""}
