@@ -699,6 +699,12 @@ function LearnerManagement({
   remove: (l: LearnerRecord) => void;
   resetPassword: (l: LearnerRecord) => void;
 }) {
+  const [accountView, setAccountView] = useState<"regular" | "test">("regular");
+  const regularCount = records.filter((learner) => !learner.testAccount).length;
+  const testCount = records.filter((learner) => learner.testAccount).length;
+  const visibleRecords = records.filter((learner) =>
+    accountView === "test" ? learner.testAccount : !learner.testAccount,
+  );
   const updateDepartment = (email: string, department: string) =>
     setRecords(
       records.map((l) => (l.email === email ? { ...l, department } : l)),
@@ -717,6 +723,22 @@ function LearnerManagement({
         title="学员管理"
         desc="编辑学员部门，并查看考核结果和考试记录。"
       />
+      <div className="mb-5 inline-flex rounded-2xl bg-slate-100 p-1.5">
+        <button
+          type="button"
+          className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${accountView === "regular" ? "bg-white text-brand shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+          onClick={() => setAccountView("regular")}
+        >
+          正式学员（{regularCount}）
+        </button>
+        <button
+          type="button"
+          className={`rounded-xl px-4 py-2.5 text-sm font-bold transition ${accountView === "test" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500 hover:text-slate-800"}`}
+          onClick={() => setAccountView("test")}
+        >
+          测试账号（{testCount}）
+        </button>
+      </div>
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] text-left text-sm">
@@ -730,7 +752,7 @@ function LearnerManagement({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {records.map((l) => {
+              {visibleRecords.map((l) => {
                 const rows = attemptsFor(l, attempts);
                 const waiting =
                   rows.length === 0 || rows.some((a) => a.status === "Pending");
@@ -836,6 +858,16 @@ function LearnerManagement({
                   </tr>
                 );
               })}
+              {!visibleRecords.length && (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-5 py-12 text-center text-sm text-slate-500"
+                  >
+                    {accountView === "test" ? "暂无测试账号" : "暂无正式学员"}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -3610,7 +3642,9 @@ export default function App() {
       <AdminDashboard
         attempts={attempts}
         quizzes={quizzes}
-        learnersCount={learnerRecords.length}
+        learnersCount={
+          learnerRecords.filter((learner) => !learner.testAccount).length
+        }
         setView={setView}
         openResult={(attempt) => {
           setSelected(attempt);
