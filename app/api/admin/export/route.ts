@@ -35,6 +35,17 @@ export async function GET(request: Request) {
     const quizId = params.get("quizId");
     const learner = params.get("learner");
     const attemptId = params.get("attemptId");
+    const selectedLearnersParam = params.get("selectedLearners");
+    let selectedLearners: string[] = [];
+    if (selectedLearnersParam) {
+      try {
+        const parsed = JSON.parse(selectedLearnersParam);
+        if (Array.isArray(parsed))
+          selectedLearners = parsed.map(String).filter(Boolean);
+      } catch {
+        return Response.json({ error: "所选学员信息无效" }, { status: 400 });
+      }
+    }
     if (!quizId && !learner && !attemptId)
       return Response.json(
         { error: "请选择一个考核或学员后再导出" },
@@ -50,7 +61,14 @@ export async function GET(request: Request) {
         : await sql`SELECT data FROM redbridge_attempts WHERE quiz_id = ${quizId} ORDER BY learner ASC, created_at ASC`;
     const quizzes = stateRows[0]?.data?.quizzes || seedQuizzes;
     const quizMap = new Map(quizzes.map((quiz: any) => [quiz.id, quiz]));
-    const attempts = attemptRows.map((row) => row.data);
+    const attempts = attemptRows
+      .map((row) => row.data)
+      .filter(
+        (attempt) =>
+          !quizId ||
+          !selectedLearners.length ||
+          selectedLearners.includes(attempt.learner),
+      );
 
     const occurrenceByAttempt = new Map<string, number>();
     const occurrenceCounts = new Map<string, number>();

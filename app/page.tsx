@@ -910,6 +910,8 @@ function AdminQuizzes({
   setQuizzes: (q: Quiz[]) => void;
   edit: (q?: Quiz) => void;
 }) {
+  const [exportQuiz, setExportQuiz] = useState<Quiz | null>(null);
+  const [exportLearners, setExportLearners] = useState<string[]>([]);
   const statsByQuiz = attempts.reduce<
     Record<
       string,
@@ -1004,16 +1006,17 @@ function AdminQuizzes({
                   </td>
                   <td className="px-5">
                     <div className="flex gap-1">
-                      <a
+                      <button
                         aria-label={`打印“${q.title}”的考核结果`}
-                        data-tooltip="按 A4 打印或保存此考核结果"
+                        data-tooltip="选择学员并导出此考核结果"
                         className="icon-action"
-                        href={`/api/admin/export?quizId=${encodeURIComponent(q.id)}`}
-                        target="_blank"
-                        rel="noreferrer"
+                        onClick={() => {
+                          setExportQuiz(q);
+                          setExportLearners([]);
+                        }}
                       >
                         <Download size={16} />
-                      </a>
+                      </button>
                       <button
                         aria-label="编辑考核"
                         data-tooltip="编辑考核"
@@ -1073,6 +1076,107 @@ function AdminQuizzes({
           </table>
         </div>
       </div>
+      <Dialog.Root
+        open={Boolean(exportQuiz)}
+        onOpenChange={(open) => !open && setExportQuiz(null)}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/50" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-32px)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <Dialog.Title className="text-xl font-bold">
+                  选择导出学员
+                </Dialog.Title>
+                <Dialog.Description className="mt-1 text-sm text-slate-500">
+                  {exportQuiz?.title} · 可选择一个或多个学员
+                </Dialog.Description>
+              </div>
+              <Dialog.Close className="icon-action" aria-label="关闭">
+                <X size={18} />
+              </Dialog.Close>
+            </div>
+            {(() => {
+              const learnerNames = Array.from(
+                new Set(
+                  attempts
+                    .filter((attempt) => attempt.quizId === exportQuiz?.id)
+                    .map((attempt) => attempt.learner),
+                ),
+              ).sort((left, right) => left.localeCompare(right, "zh-CN"));
+              return learnerNames.length ? (
+                <>
+                  <div className="mt-5 flex items-center justify-between border-b border-slate-100 pb-3">
+                    <span className="text-sm font-semibold text-slate-600">
+                      已选择 {exportLearners.length} / {learnerNames.length} 人
+                    </span>
+                    <button
+                      type="button"
+                      className="text-sm font-bold text-brand"
+                      onClick={() =>
+                        setExportLearners(
+                          exportLearners.length === learnerNames.length
+                            ? []
+                            : learnerNames,
+                        )
+                      }
+                    >
+                      {exportLearners.length === learnerNames.length
+                        ? "取消全选"
+                        : "全选"}
+                    </button>
+                  </div>
+                  <div className="mt-3 max-h-72 space-y-1 overflow-y-auto">
+                    {learnerNames.map((name) => (
+                      <label
+                        key={name}
+                        className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-3 hover:bg-slate-50"
+                      >
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 accent-brand"
+                          checked={exportLearners.includes(name)}
+                          onChange={() =>
+                            setExportLearners((current) =>
+                              current.includes(name)
+                                ? current.filter((item) => item !== name)
+                                : [...current, name],
+                            )
+                          }
+                        />
+                        <span className="font-medium">{name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary mt-5 w-full disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!exportLearners.length || !exportQuiz}
+                    onClick={() => {
+                      if (!exportQuiz || !exportLearners.length) return;
+                      const selected = encodeURIComponent(
+                        JSON.stringify(exportLearners),
+                      );
+                      window.open(
+                        `/api/admin/export?quizId=${encodeURIComponent(exportQuiz.id)}&selectedLearners=${selected}`,
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                    }}
+                  >
+                    <Download size={17} />
+                    导出所选学员 PDF
+                  </button>
+                </>
+              ) : (
+                <p className="mt-6 rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-500">
+                  此考核目前没有学员提交记录。
+                </p>
+              );
+            })()}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   );
 }
