@@ -13,7 +13,6 @@ export const dynamic = "force-dynamic";
 
 const retiredDemoQuizIds = new Set(["product-03", "privacy-101", "conduct"]);
 const currentDemoQuizIds = new Set(seedQuizzes.map((quiz) => quiz.id));
-const attemptsResetVersion = "2026-08-20-clear-all-attempts";
 const essayFormatVersion = "2026-08-20-word-exact-paragraphs-v1";
 
 export async function GET() {
@@ -66,12 +65,6 @@ export async function GET() {
       }));
       data.essayFormatVersion = essayFormatVersion;
     }
-    const shouldResetAttempts =
-      data.attemptsResetVersion !== attemptsResetVersion;
-    if (shouldResetAttempts) {
-      await sql`DELETE FROM redbridge_attempts`;
-      data.attemptsResetVersion = attemptsResetVersion;
-    }
     const storedQuizzes = data.quizzes || [];
     const shouldReplaceRetiredDemos = storedQuizzes.some((quiz: any) =>
       retiredDemoQuizIds.has(quiz.id),
@@ -107,7 +100,6 @@ export async function GET() {
     ];
     if (
       shouldReplaceRetiredDemos ||
-      shouldResetAttempts ||
       shouldInitializeQuestionBanks ||
       shouldUpdateEssayFormat ||
       existing.length !== originalLearners.length

@@ -2342,7 +2342,7 @@ function QuizTake({
   onExit,
 }: {
   quiz: Quiz;
-  onComplete: (a: Attempt) => void;
+  onComplete: (a: Attempt) => Promise<{ ok: boolean; error?: string }>;
   onExit: () => void;
 }) {
   const [presentation] = useState(() => {
@@ -2385,6 +2385,11 @@ function QuizTake({
   const [flags, setFlags] = useState<number[]>([]);
   const [seconds, setSeconds] = useState(randomizedQuiz.timeLimit * 60);
   const [submitOpen, setSubmitOpen] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [autosaveStatus, setAutosaveStatus] = useState<
+    "saving" | "saved" | "failed"
+  >("saving");
   const [violations, setViolations] = useState({ tab: 0, fs: 0 });
   const finishingRef = useRef(false);
   const answered = randomizedQuiz.questions.filter((question, index) => {
@@ -2393,9 +2398,36 @@ function QuizTake({
       ? typeof answer === "string" && answer.trim().length > 0
       : typeof answer === "number";
   }).length;
-  const finish = () => {
+  useEffect(() => {
+    setAutosaveStatus("saving");
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/attempts/draft", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            quizId: quiz.id,
+            answers,
+            questionOrder: presentation.questionOrder,
+            optionOrders: presentation.optionOrders,
+            questionSnapshot: randomizedQuiz.questions,
+            timeRemaining: seconds,
+            tabSwitches: violations.tab,
+            fullscreenExits: violations.fs,
+          }),
+        });
+        setAutosaveStatus(response.ok ? "saved" : "failed");
+      } catch {
+        setAutosaveStatus("failed");
+      }
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [answers, violations, quiz.id]);
+  const finish = async () => {
     if (finishingRef.current) return;
     finishingRef.current = true;
+    setSubmitting(true);
+    setSubmitError("");
     const correct = randomizedQuiz.questions.filter(
       (q, i) => (q.type ?? "choice") === "choice" && answers[i] === q.correct,
     ).length;
@@ -2427,12 +2459,16 @@ function QuizTake({
       tabSwitches: violations.tab,
       fullscreenExits: violations.fs,
     };
-    const complete = () => onComplete(completedAttempt);
-    if (document.fullscreenElement) {
-      document.exitFullscreen().then(complete).catch(complete);
-    } else {
-      complete();
+    const result = await onComplete(completedAttempt);
+    if (!result.ok) {
+      finishingRef.current = false;
+      setSubmitting(false);
+      setSubmitError(result.error || "提交失败，请再次提交或联系管理员。");
+      setSubmitOpen(true);
+      return;
     }
+    if (document.fullscreenElement)
+      await document.exitFullscreen().catch(() => {});
   };
   useEffect(() => {
     const t = setInterval(
@@ -2484,6 +2520,15 @@ function QuizTake({
                 Assessment in progress
               </p>
               <h1 className="font-bold">{quiz.title}</h1>
+              <p
+                className={`mt-1 text-xs ${autosaveStatus === "failed" ? "text-rose-600" : "text-slate-400"}`}
+              >
+                {autosaveStatus === "saving"
+                  ? "正在保存作答…"
+                  : autosaveStatus === "saved"
+                    ? "作答已自动保存"
+                    : "自动保存暂时失败，系统将继续重试"}
+              </p>
             </div>
             <div className="flex items-center gap-4">
               <div
@@ -2690,12 +2735,27 @@ function QuizTake({
               </strong>{" "}
               题，仍有 {quiz.questions.length - answered} 题未回答。
             </Dialog.Description>
+            {submitError && (
+              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-700">
+                <strong>提交失败。</strong>
+                <br />
+                {submitError} 请检查网络后再次提交；如果仍然失败，请联系管理员。
+              </div>
+            )}
             <div className="mt-6 flex justify-end gap-2">
               <Dialog.Close className="btn-secondary">
                 Continue quiz
               </Dialog.Close>
-              <button className="btn-primary" onClick={finish}>
-                Submit quiz
+              <button
+                className="btn-primary disabled:cursor-wait disabled:opacity-60"
+                disabled={submitting}
+                onClick={() => void finish()}
+              >
+                {submitting
+                  ? "正在提交…"
+                  : submitError
+                    ? "再次提交"
+                    : "Submit quiz"}
               </button>
             </div>
           </Dialog.Content>
@@ -3373,32 +3433,38 @@ export default function App() {
                 maxAttempts: active.maxAttempts ?? 1,
               }),
             });
-            const localPreview =
-              window.location.hostname === "localhost" ||
-              window.location.hostname === "127.0.0.1";
-            const canUseLocalFallback =
-              localPreview &&
-              (response.status === 401 || response.status === 503);
-            if (!response.ok && !canUseLocalFallback) {
-              const body = await response.json();
-              alert(body.error || "成绩提交失败");
-              setView("quizzes");
-              return;
+            if (!response.ok) {
+              const body = await response.json().catch(() => ({}));
+              return {
+                ok: false,
+                error: body.error || "成绩未能保存到后端。",
+              };
             }
-          } catch {}
-          const learnerAttempt: Attempt = {
-            ...a,
-            questionSnapshot: a.questionSnapshot || active.questions,
-            passingScoreSnapshot: active.passingScore,
-            correct: 0,
-            total: 0,
-            score: 0,
-            status: "Pending",
-          };
-          setAttempts([learnerAttempt, ...attempts]);
-          setSelected(learnerAttempt);
-          setResultBack("results");
-          setView("resultDetail");
+            const savedAttempt = (await response.json()) as Attempt;
+            const learnerAttempt: Attempt = {
+              ...a,
+              ...savedAttempt,
+              questionSnapshot:
+                savedAttempt.questionSnapshot ||
+                a.questionSnapshot ||
+                active.questions,
+              passingScoreSnapshot: active.passingScore,
+              correct: 0,
+              total: 0,
+              score: 0,
+              status: "Pending",
+            };
+            setAttempts((current) => [learnerAttempt, ...current]);
+            setSelected(learnerAttempt);
+            setResultBack("results");
+            setView("resultDetail");
+            return { ok: true };
+          } catch {
+            return {
+              ok: false,
+              error: "无法连接后端，成绩尚未提交。",
+            };
+          }
         }}
       />
     );

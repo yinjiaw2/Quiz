@@ -5,7 +5,6 @@ import { seedQuizzes } from "../../data";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-const attemptsResetVersion = "2026-08-20-clear-all-attempts";
 
 export async function GET() {
   try {
@@ -13,23 +12,6 @@ export async function GET() {
     if (!session)
       return NextResponse.json({ error: "请先登录" }, { status: 401 });
     const sql = await ensureSchema();
-    const resetRows =
-      await sql`SELECT data FROM redbridge_state WHERE id = 'main'`;
-    if (
-      resetRows.length &&
-      resetRows[0].data.attemptsResetVersion !== attemptsResetVersion
-    ) {
-      await sql`DELETE FROM redbridge_attempts`;
-      const resetState = {
-        ...resetRows[0].data,
-        attemptsResetVersion,
-      };
-      await sql`
-        UPDATE redbridge_state
-        SET data = ${JSON.stringify(resetState)}::jsonb, updated_at = NOW()
-        WHERE id = 'main'
-      `;
-    }
     const rows =
       session.role === "admin"
         ? await sql`SELECT data FROM redbridge_attempts ORDER BY created_at DESC`
@@ -179,6 +161,10 @@ export async function POST(request: Request) {
         { error: `已达到最多 ${limit} 次答题限制` },
         { status: 409 },
       );
+    await sql`
+      DELETE FROM redbridge_attempt_drafts
+      WHERE quiz_id = ${attempt.quizId} AND username = ${session.username}
+    `;
     const learnerResponse = { ...rows[0].data };
     delete learnerResponse.essayGrades;
     delete learnerResponse.essayComments;

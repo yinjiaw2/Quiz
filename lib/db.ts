@@ -56,5 +56,15 @@ export async function ensureSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS redbridge_attempt_drafts (
+      quiz_id TEXT NOT NULL,
+      username TEXT NOT NULL,
+      learner TEXT NOT NULL,
+      data JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (quiz_id, username)
+    )
+  `;
   return sql;
 }
