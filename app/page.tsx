@@ -956,16 +956,21 @@ function LearnerDetail({
 function AdminQuizzes({
   quizzes,
   attempts,
+  learnerRecords,
   setQuizzes,
   edit,
 }: {
   quizzes: Quiz[];
   attempts: Attempt[];
+  learnerRecords: LearnerRecord[];
   setQuizzes: (q: Quiz[]) => void;
   edit: (q?: Quiz) => void;
 }) {
   const [exportQuiz, setExportQuiz] = useState<Quiz | null>(null);
   const [exportLearners, setExportLearners] = useState<string[]>([]);
+  const [exportAccountView, setExportAccountView] = useState<
+    "regular" | "test"
+  >("regular");
   const statsByQuiz = attempts.reduce<
     Record<
       string,
@@ -1067,6 +1072,7 @@ function AdminQuizzes({
                         onClick={() => {
                           setExportQuiz(q);
                           setExportLearners([]);
+                          setExportAccountView("regular");
                         }}
                       >
                         <Download size={16} />
@@ -1151,15 +1157,50 @@ function AdminQuizzes({
               </Dialog.Close>
             </div>
             {(() => {
-              const learnerNames = Array.from(
+              const allLearnerNames = Array.from(
                 new Set(
                   attempts
                     .filter((attempt) => attempt.quizId === exportQuiz?.id)
                     .map((attempt) => attempt.learner),
                 ),
               ).sort((left, right) => left.localeCompare(right, "zh-CN"));
+              const testAccountNames = new Set(
+                learnerRecords
+                  .filter((learner) => learner.testAccount)
+                  .map((learner) => learner.name),
+              );
+              const regularNames = allLearnerNames.filter(
+                (name) => !testAccountNames.has(name),
+              );
+              const testNames = allLearnerNames.filter((name) =>
+                testAccountNames.has(name),
+              );
+              const learnerNames =
+                exportAccountView === "test" ? testNames : regularNames;
               return learnerNames.length ? (
                 <>
+                  <div className="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+                    <button
+                      type="button"
+                      className={`rounded-lg px-3 py-2 text-sm font-bold ${exportAccountView === "regular" ? "bg-white text-brand shadow-sm" : "text-slate-500"}`}
+                      onClick={() => {
+                        setExportAccountView("regular");
+                        setExportLearners([]);
+                      }}
+                    >
+                      正式学员（{regularNames.length}）
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded-lg px-3 py-2 text-sm font-bold ${exportAccountView === "test" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}
+                      onClick={() => {
+                        setExportAccountView("test");
+                        setExportLearners([]);
+                      }}
+                    >
+                      测试账号（{testNames.length}）
+                    </button>
+                  </div>
                   <div className="mt-5 flex items-center justify-between border-b border-slate-100 pb-3">
                     <span className="text-sm font-semibold text-slate-600">
                       已选择 {exportLearners.length} / {learnerNames.length} 人
@@ -1223,9 +1264,33 @@ function AdminQuizzes({
                   </button>
                 </>
               ) : (
-                <p className="mt-6 rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-500">
-                  此考核目前没有学员提交记录。
-                </p>
+                <>
+                  <div className="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+                    <button
+                      type="button"
+                      className={`rounded-lg px-3 py-2 text-sm font-bold ${exportAccountView === "regular" ? "bg-white text-brand shadow-sm" : "text-slate-500"}`}
+                      onClick={() => {
+                        setExportAccountView("regular");
+                        setExportLearners([]);
+                      }}
+                    >
+                      正式学员（{regularNames.length}）
+                    </button>
+                    <button
+                      type="button"
+                      className={`rounded-lg px-3 py-2 text-sm font-bold ${exportAccountView === "test" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500"}`}
+                      onClick={() => {
+                        setExportAccountView("test");
+                        setExportLearners([]);
+                      }}
+                    >
+                      测试账号（{testNames.length}）
+                    </button>
+                  </div>
+                  <p className="mt-4 rounded-xl bg-slate-50 p-5 text-center text-sm text-slate-500">
+                    当前分类没有学员提交记录。
+                  </p>
+                </>
               );
             })()}
           </Dialog.Content>
@@ -3658,6 +3723,7 @@ export default function App() {
       <AdminQuizzes
         quizzes={quizzes}
         attempts={attempts}
+        learnerRecords={learnerRecords}
         setQuizzes={updateQuizzesAndSync}
         edit={(q) => {
           setEdit(q);
