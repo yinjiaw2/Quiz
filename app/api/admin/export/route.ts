@@ -217,7 +217,7 @@ export async function GET(request: Request) {
         .meta { display: flex; flex-wrap: wrap; gap: 7px 20px; color: #475569; font-size: 11px; }
         .test-account { margin-left: 4px; color: #6d28d9; }
         .question { break-inside: avoid; margin: 0 0 11px; padding: 11px 12px; border: 1px solid #dbe4df; border-radius: 8px; font-size: 11px; line-height: 1.65; }
-        .question h4 { margin: 0 0 7px; color: #0f172a; font-size: 12px; }
+        .question h4 { margin: 0 0 7px; color: #0f172a; font-size: 12px; white-space: pre-wrap; }
         .incorrect-number { display: inline-block; min-width: 22px; border-radius: 5px; padding: 1px 5px; background: #fee2e2; color: #b91c1c; font-weight: 800; }
         .answer { white-space: pre-wrap; }
         .comment { margin-top: 5px; padding: 7px 9px; background: #f8fafc; white-space: pre-wrap; }

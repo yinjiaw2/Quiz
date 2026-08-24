@@ -2765,7 +2765,7 @@ function QuizTake({
               <EssayPrompt text={q.text} />
             </div>
           ) : (
-            <h2 className="mt-7 max-w-3xl text-2xl font-semibold leading-9">
+            <h2 className="mt-7 max-w-3xl whitespace-pre-wrap text-2xl font-semibold leading-9">
               {q.text}
             </h2>
           )}
@@ -3040,7 +3040,7 @@ function ResultDetail({
                         <EssayPrompt text={q.text} numbered={i + 1} />
                       </div>
                     ) : (
-                      <p className="font-semibold">
+                      <p className="whitespace-pre-wrap font-semibold">
                         {i + 1}. {q.text}
                       </p>
                     )}

@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const retiredDemoQuizIds = new Set(["product-03", "privacy-101", "conduct"]);
 const currentDemoQuizIds = new Set(seedQuizzes.map((quiz) => quiz.id));
 const essayFormatVersion = "2026-08-20-word-exact-paragraphs-v1";
+const questionBankCategoriesVersion = "2026-08-24-sales-operations-v1";
 
 export async function GET() {
   try {
@@ -39,6 +40,24 @@ export async function GET() {
     const data = rows[0].data;
     const shouldInitializeQuestionBanks = !Array.isArray(data.questionBanks);
     if (shouldInitializeQuestionBanks) data.questionBanks = seedQuestionBanks;
+    const shouldUpdateQuestionBankCategories =
+      data.questionBankCategoriesVersion !== questionBankCategoriesVersion;
+    if (shouldUpdateQuestionBankCategories) {
+      data.questionBanks = (data.questionBanks || []).map((bank: any) =>
+        bank.id === "redbridge-training-core"
+          ? { ...bank, title: "销售题库" }
+          : bank,
+      );
+      const operationsBank = seedQuestionBanks.find(
+        (bank) => bank.id === "mkt-operations-final",
+      );
+      if (
+        operationsBank &&
+        !data.questionBanks.some((bank: any) => bank.id === operationsBank.id)
+      )
+        data.questionBanks.push(operationsBank);
+      data.questionBankCategoriesVersion = questionBankCategoriesVersion;
+    }
     const shouldUpdateEssayFormat =
       data.essayFormatVersion !== essayFormatVersion;
     if (shouldUpdateEssayFormat) {
@@ -102,6 +121,7 @@ export async function GET() {
     if (
       shouldReplaceRetiredDemos ||
       shouldInitializeQuestionBanks ||
+      shouldUpdateQuestionBankCategories ||
       shouldUpdateEssayFormat ||
       existing.length !== originalLearners.length
     ) {
