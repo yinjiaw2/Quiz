@@ -15,6 +15,7 @@ const retiredDemoQuizIds = new Set(["product-03", "privacy-101", "conduct"]);
 const currentDemoQuizIds = new Set(seedQuizzes.map((quiz) => quiz.id));
 const essayFormatVersion = "2026-08-20-word-exact-paragraphs-v1";
 const questionBankCategoriesVersion = "2026-08-24-sales-operations-images-v2";
+const learnerNameVersion = "2026-08-24-wang-to-eric-v1";
 
 export async function GET() {
   try {
@@ -35,9 +36,37 @@ export async function GET() {
         RETURNING data
       `;
     }
-    const users =
+    let users =
       await sql`SELECT username, name FROM redbridge_users ORDER BY created_at`;
     const data = rows[0].data;
+    const shouldRenameTestLearner =
+      data.learnerNameVersion !== learnerNameVersion;
+    if (shouldRenameTestLearner) {
+      await sql`
+        UPDATE redbridge_users
+        SET name = 'eric测试'
+        WHERE name = '王测试'
+      `;
+      await sql`
+        UPDATE redbridge_attempts
+        SET learner = 'eric测试',
+            data = jsonb_set(data, '{learner}', to_jsonb('eric测试'::text), true)
+        WHERE learner = '王测试' OR data->>'learner' = '王测试'
+      `;
+      await sql`
+        UPDATE redbridge_attempt_drafts
+        SET learner = 'eric测试',
+            data = jsonb_set(data, '{learner}', to_jsonb('eric测试'::text), true)
+        WHERE learner = '王测试' OR data->>'learner' = '王测试'
+      `;
+      users = users.map((user) =>
+        user.name === "王测试" ? { ...user, name: "eric测试" } : user,
+      );
+      data.learnerRecords = (data.learnerRecords || []).map((learner: any) =>
+        learner.name === "王测试" ? { ...learner, name: "eric测试" } : learner,
+      );
+      data.learnerNameVersion = learnerNameVersion;
+    }
     const shouldInitializeQuestionBanks = !Array.isArray(data.questionBanks);
     if (shouldInitializeQuestionBanks) data.questionBanks = seedQuestionBanks;
     const shouldUpdateQuestionBankCategories =
@@ -164,6 +193,7 @@ export async function GET() {
       shouldInitializeQuestionBanks ||
       shouldUpdateQuestionBankCategories ||
       shouldUpdateEssayFormat ||
+      shouldRenameTestLearner ||
       existing.length !== originalLearners.length
     ) {
       data.learnerRecords = learnerRecords;
