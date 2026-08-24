@@ -160,14 +160,23 @@ export async function GET(request: Request) {
           : answer === question.correct
             ? "正确"
             : "错误";
+        const questionImage = question.image
+          ? `<img class="question-image" src="${escapeHtml(question.image)}" alt="题目材料" />`
+          : "";
+        const referenceImage =
+          isEssay && question.referenceImage
+            ? `<div class="reference-image"><strong>参考答案图片：</strong><img src="${escapeHtml(question.referenceImage)}" alt="管理员参考答案" /></div>`
+            : "";
         return `
           <article class="question">
             <h4><span class="${incorrectChoice ? "incorrect-number" : ""}">${index + 1}.</span> ${escapeHtml(isEssay ? essayTitle : question.text)}</h4>
+            ${questionImage}
             <div class="answer"><strong>学员答案：</strong>${escapeHtml(learnerAnswer)}</div>
             ${!isEssay ? `<div><strong>正确答案：</strong>${escapeHtml(correctAnswer)}</div>` : ""}
             <div><strong>${isEssay ? "管理员评分" : "答题结果"}：</strong>${escapeHtml(grade)}</div>
             ${isEssay ? `<div><strong>批改人：</strong>${escapeHtml(attempt.essayGraders?.[index] || "未填写")}</div>` : ""}
             ${isEssay ? `<div class="comment"><strong>批改意见：</strong>${escapeHtml(attempt.essayComments?.[index] || "暂无批改意见")}</div>` : ""}
+            ${referenceImage}
           </article>`;
       };
 
@@ -217,6 +226,8 @@ export async function GET(request: Request) {
         .meta { display: flex; flex-wrap: wrap; gap: 7px 20px; color: #475569; font-size: 11px; }
         .test-account { margin-left: 4px; color: #6d28d9; }
         .question { break-inside: avoid; margin: 0 0 11px; padding: 11px 12px; border: 1px solid #dbe4df; border-radius: 8px; font-size: 11px; line-height: 1.65; }
+        .question-image, .reference-image img { display: block; max-width: 100%; max-height: 150mm; margin: 8px 0; object-fit: contain; }
+        .reference-image { margin-top: 8px; padding: 8px; border: 1px solid #f4d38b; background: #fffaf0; }
         .question h4 { margin: 0 0 7px; color: #0f172a; font-size: 12px; white-space: pre-wrap; }
         .incorrect-number { display: inline-block; min-width: 22px; border-radius: 5px; padding: 1px 5px; background: #fee2e2; color: #b91c1c; font-weight: 800; }
         .answer { white-space: pre-wrap; }

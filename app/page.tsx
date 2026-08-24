@@ -1300,6 +1300,79 @@ function AdminQuizzes({
   );
 }
 
+function QuestionImageFields({
+  image,
+  referenceImage,
+  onChange,
+}: {
+  image?: string;
+  referenceImage?: string;
+  onChange: (patch: { image?: string; referenceImage?: string }) => void;
+}) {
+  const upload = (
+    file: File | undefined,
+    fieldName: "image" | "referenceImage",
+  ) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return alert("请选择图片文件");
+    if (file.size > 2 * 1024 * 1024) return alert("单张图片不能超过 2MB");
+    const reader = new FileReader();
+    reader.onload = () => onChange({ [fieldName]: String(reader.result) });
+    reader.readAsDataURL(file);
+  };
+  const renderField = (
+    label: string,
+    value: string | undefined,
+    fieldName: "image" | "referenceImage",
+    note: string,
+  ) => (
+    <div className="rounded-xl border border-slate-200 p-4">
+      <label className="label">{label}</label>
+      <p className="mb-3 text-xs text-slate-500">{note}</p>
+      {value && (
+        <img
+          src={value}
+          alt={label}
+          className="mb-3 max-h-52 w-full rounded-lg border border-slate-200 object-contain"
+        />
+      )}
+      <div className="flex flex-wrap gap-2">
+        <label className="btn-secondary cursor-pointer">
+          <Plus size={15} />
+          {value ? "更换图片" : "上传图片"}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(event) => upload(event.target.files?.[0], fieldName)}
+          />
+        </label>
+        {value && (
+          <button
+            type="button"
+            className="btn-secondary text-rose-600"
+            onClick={() => onChange({ [fieldName]: undefined })}
+          >
+            <Trash2 size={15} />
+            删除图片
+          </button>
+        )}
+      </div>
+    </div>
+  );
+  return (
+    <div className="mt-4 grid gap-3 md:grid-cols-2">
+      {renderField("题目图片", image, "image", "学员答题时可以看到")}
+      {renderField(
+        "参考答案图片",
+        referenceImage,
+        "referenceImage",
+        "仅管理员查看答案和批改时显示",
+      )}
+    </div>
+  );
+}
+
 function QuestionBankManagement({
   banks,
   saveBanks,
@@ -1514,6 +1587,11 @@ function QuestionBankManagement({
                     onChange={(event) =>
                       updateQuestion(index, { text: event.target.value })
                     }
+                  />
+                  <QuestionImageFields
+                    image={question.image}
+                    referenceImage={question.referenceImage}
+                    onChange={(patch) => updateQuestion(index, patch)}
                   />
                   {(question.type ?? "choice") === "choice" ? (
                     <div className="mt-4 space-y-3">
@@ -2077,6 +2155,11 @@ function Builder({
                 uq({ text: e.target.value });
                 setQuestionError("");
               }}
+            />
+            <QuestionImageFields
+              image={question.image}
+              referenceImage={question.referenceImage}
+              onChange={(patch) => uq(patch)}
             />
             {(question.type ?? "choice") === "choice" ? (
               <div className="mt-4 grid gap-3">
@@ -2769,6 +2852,13 @@ function QuizTake({
               {q.text}
             </h2>
           )}
+          {q.image && (
+            <img
+              src={q.image}
+              alt="题目材料"
+              className="mt-6 max-h-[520px] w-full rounded-2xl border border-slate-200 bg-white object-contain"
+            />
+          )}
           {(q.type ?? "choice") === "choice" ? (
             <div className="mt-8 grid gap-3">
               {q.options.map((o, i) => (
@@ -3044,6 +3134,13 @@ function ResultDetail({
                         {i + 1}. {q.text}
                       </p>
                     )}
+                    {q.image && (
+                      <img
+                        src={q.image}
+                        alt="题目材料"
+                        className="mt-4 max-h-[520px] w-full rounded-xl border border-slate-200 bg-white object-contain"
+                      />
+                    )}
                     {(q.type ?? "choice") === "essay" ? (
                       <>
                         <div className="mt-3 whitespace-pre-wrap rounded-xl bg-slate-50 p-4 text-sm leading-7 text-slate-700">
@@ -3053,6 +3150,18 @@ function ResultDetail({
                           回答字数：
                           {typeof a === "string" ? a.trim().length : 0}
                         </p>
+                        {admin && q.referenceImage && (
+                          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                            <p className="mb-2 text-xs font-bold text-amber-800">
+                              管理员参考答案图片
+                            </p>
+                            <img
+                              src={q.referenceImage}
+                              alt="管理员参考答案"
+                              className="max-h-[520px] w-full rounded-lg bg-white object-contain"
+                            />
+                          </div>
+                        )}
                         {admin && onGrade && (
                           <div className="mt-4">
                             <label className="label">批改人姓名</label>

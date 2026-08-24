@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 const retiredDemoQuizIds = new Set(["product-03", "privacy-101", "conduct"]);
 const currentDemoQuizIds = new Set(seedQuizzes.map((quiz) => quiz.id));
 const essayFormatVersion = "2026-08-20-word-exact-paragraphs-v1";
-const questionBankCategoriesVersion = "2026-08-24-sales-operations-v1";
+const questionBankCategoriesVersion = "2026-08-24-sales-operations-images-v2";
 
 export async function GET() {
   try {
@@ -56,6 +56,47 @@ export async function GET() {
         !data.questionBanks.some((bank: any) => bank.id === operationsBank.id)
       )
         data.questionBanks.push(operationsBank);
+      else if (operationsBank)
+        data.questionBanks = data.questionBanks.map((bank: any) =>
+          bank.id === operationsBank.id
+            ? {
+                ...bank,
+                questions: (bank.questions || []).map((question: any) => {
+                  const seededQuestion = operationsBank.questions.find(
+                    (item) => item.id === question.id,
+                  );
+                  return seededQuestion?.image || seededQuestion?.referenceImage
+                    ? {
+                        ...question,
+                        image: seededQuestion.image,
+                        referenceImage: seededQuestion.referenceImage,
+                      }
+                    : question;
+                }),
+              }
+            : bank,
+        );
+      data.quizzes = (data.quizzes || []).map((quiz: any) => ({
+        ...quiz,
+        questions: (quiz.questions || []).map((question: any) => {
+          const text = String(question.text || "");
+          if (text.includes("当观测到聚光后台出现以下数据时"))
+            return {
+              ...question,
+              image:
+                question.image || "/question-images/mkt-dashboard-data.png",
+            };
+          if (text.includes("本次搜索推广日预算为¥2,000"))
+            return {
+              ...question,
+              image: question.image || "/question-images/mkt-keyword-table.png",
+              referenceImage:
+                question.referenceImage ||
+                "/question-images/mkt-keyword-reference.png",
+            };
+          return question;
+        }),
+      }));
       data.questionBankCategoriesVersion = questionBankCategoriesVersion;
     }
     const shouldUpdateEssayFormat =

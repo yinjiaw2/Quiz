@@ -481,6 +481,7 @@ export const seedQuestionBanks: QuestionBank[] = [
         correct: 0,
         explanation: "",
         wordLimit: 1000,
+        image: "/question-images/mkt-dashboard-data.png",
       },
     ],
   },
@@ -621,6 +622,8 @@ Marketing雇主担保｜竞争程度：中｜用户意图：专业及担保需�
         explanation:
           "建议重点投放：485转482（高出价、高优先级）、Marketing雇主担保（中高出价、高优先级）、墨尔本雇主担保（高出价、高优先级）、485快到期怎么办（中出价、中高优先级）、482转186（中高出价、中高优先级）。",
         wordLimit: 1000,
+        image: "/question-images/mkt-keyword-table.png",
+        referenceImage: "/question-images/mkt-keyword-reference.png",
       },
       {
         id: 1010,

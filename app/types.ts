@@ -7,6 +7,8 @@ export type Question = {
   correct: number;
   explanation: string;
   wordLimit?: number;
+  image?: string;
+  referenceImage?: string;
 };
 export type QuestionBank = {
   id: string;
