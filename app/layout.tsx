@@ -1,4 +1,5 @@
 import "./globals.css";
+import ContentProtection from "./content-protection";
 
 export const metadata = {
   title: "Redbridge 实习生考核",
@@ -10,7 +11,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <ContentProtection />
+        {children}
+      </body>
     </html>
   );
 }
